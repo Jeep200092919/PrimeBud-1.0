@@ -14,7 +14,7 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # Secrets / Env
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
-GROQ_MODEL = st.secrets.get("GROQ_MODEL", os.getenv("GROQ_MODEL", "llama3.3-70b"))
+GROQ_MODEL = st.secrets.get("GROQ_MODEL", os.getenv("GROQ_MODEL", "llama3.3-70b-versatile"))
 
 GITHUB_URL = "https://github.com/Jeep200092919/PrimeBud-1.0"
 
@@ -22,10 +22,9 @@ GITHUB_URL = "https://github.com/Jeep200092919/PrimeBud-1.0"
 # LOGIN / CONTAS
 # ==============================
 if "usuarios" not in st.session_state:
-    st.session_state.usuarios = {
-        "admin": {"senha": "1234", "plano": "Ultra"},
-        "teste": {"senha": "0000", "plano": "Free"},
-    }
+    st.session_state.usuarios =
+    
+
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
 if "plano" not in st.session_state:
@@ -78,7 +77,7 @@ usuario = st.session_state.usuario
 plano = st.session_state.plano
 
 # ==============================
-# BACKEND — GROQ + OLLAMA (Fallback)
+# BACKEND — GROQ + FALLBACK OLLAMA
 # ==============================
 def usar_groq() -> bool:
     return bool(GROQ_API_KEY)
@@ -91,14 +90,20 @@ def _map_options_for_openai_like(options: dict | None) -> dict:
         "max_tokens": options.get("num_predict", 400),
     }
 
-def chat_api(model: str, prompt: str, options: dict | None = None, timeout: int = 120) -> str:
+def chat_api(model: str, prompt: str, historico, options: dict | None = None, timeout: int = 120) -> str:
+    """Envia o histórico completo do chat à Groq ou Ollama."""
+    messages = [{"role": "system", "content": "Você é o PrimeBud Turbo — claro, rápido e útil."}]
+    for m in historico:
+        if m["autor"] == "Você":
+            messages.append({"role": "user", "content": m["texto"]})
+        else:
+            messages.append({"role": "assistant", "content": m["texto"]})
+    messages.append({"role": "user", "content": prompt})
+
     if usar_groq():
         payload = {
             "model": GROQ_MODEL,
-            "messages": [
-                {"role": "system", "content": "Você é o PrimeBud Turbo — claro, rápido e útil."},
-                {"role": "user", "content": prompt},
-            ],
+            "messages": messages,
             "stream": False,
             **_map_options_for_openai_like(options),
         }
@@ -108,17 +113,10 @@ def chat_api(model: str, prompt: str, options: dict | None = None, timeout: int 
             data = r.json()
             return data["choices"][0]["message"]["content"]
         except Exception as e:
-            return f"❌ Erro ao conectar à Groq API: {str(e)}"
+            return f"❌ Erro Groq: {str(e)}"
 
-    # Se a Groq não estiver configurada, tenta Ollama local
-    payload = {
-        "model": model,
-        "stream": False,
-        "messages": [
-            {"role": "system", "content": "Você é o PrimeBud Turbo — claro, rápido e útil."},
-            {"role": "user", "content": prompt},
-        ],
-    }
+    # Fallback: Ollama local
+    payload = {"model": model, "stream": False, "messages": messages}
     if options:
         payload["options"] = options
     try:
@@ -126,14 +124,11 @@ def chat_api(model: str, prompt: str, options: dict | None = None, timeout: int 
         data = r.json()
         return data.get("message", {}).get("content", "⚠️ Erro: resposta inválida do Ollama.")
     except Exception as e:
-        return f"❌ Erro ao conectar ao Ollama: {str(e)}"
+        return f"❌ Erro Ollama: {str(e)}"
 
 # ==============================
-# MODOS
+# MODOS E CONFIGURAÇÕES
 # ==============================
-MODEL_IDS = {
-    "LLaMA 3.3 70B": "llama3.3:70b",
-}
 MODOS_DESC = {
     "⚡ Flash": "Respostas curtíssimas e instantâneas.",
     "🔵 Normal": "Respostas equilibradas e naturais.",
@@ -143,36 +138,45 @@ MODOS_DESC = {
     "☄️ Ultra (Beta)": "Mais tokens e contexto.",
     "✍️ Escritor": "Texto criativo de 5–10 linhas.",
     "🏫 Escola": "Explicações didáticas do EM.",
-    "👨‍🏫 Professor": "Aulas/resumos com exemplos.",
+    "👨‍🏫 Professor": "Aulas e resumos com exemplos.",
     "🎨 Designer": "Ideias visuais e UI/UX.",
     "💻 Codificador": "Código limpo + explicação curta.",
-    "🧩 Estratégias": "Plano prático com metas e ações.",
+    "🧩 Estratégias": "Planos práticos com metas e ações.",
 }
-MODE_LIMITS = {m: ["LLaMA 3.3 70B"] for m in MODOS_DESC.keys()}
 
-def gerar_resposta(modo: str, msg: str) -> str:
+def gerar_resposta(modo: str, msg: str, historico) -> str:
+    """Gera resposta do PrimeBud com memória de conversa e ajuste automático de tokens."""
     base_prompt = MODOS_DESC.get(modo, "Seja direto e útil.")
     full_prompt = f"{base_prompt}\n\n{msg}"
 
+    palavras = len(msg.split())
+    if palavras < 40:
+        base_tokens = 400
+    elif palavras < 120:
+        base_tokens = 800
+    else:
+        base_tokens = 1200
+
     config = {
-        "⚡ Flash": {"temperature": 0.3, "num_predict": 100},
-        "🔵 Normal": {"temperature": 0.5, "num_predict": 220},
-        "🍃 Econômico": {"temperature": 0.4, "num_predict": 120},
-        "💬 Mini": {"temperature": 0.6, "num_predict": 150},
-        "💎 Pro (Beta)": {"temperature": 0.35, "num_predict": 240},
-        "☄️ Ultra (Beta)": {"temperature": 0.6, "num_predict": 320},
-        "✍️ Escritor": {"temperature": 0.9, "num_predict": 260},
-        "🏫 Escola": {"temperature": 0.6, "num_predict": 250},
-        "👨‍🏫 Professor": {"temperature": 0.4, "num_predict": 300},
-        "🎨 Designer": {"temperature": 0.95, "num_predict": 220},
-        "💻 Codificador": {"temperature": 0.2, "num_predict": 280},
-        "🧩 Estratégias": {"temperature": 0.6, "num_predict": 260},
+        "⚡ Flash": {"temperature": 0.3, "num_predict": min(150, base_tokens)},
+        "🔵 Normal": {"temperature": 0.5, "num_predict": min(600, base_tokens + 200)},
+        "🍃 Econômico": {"temperature": 0.4, "num_predict": min(250, base_tokens)},
+        "💬 Mini": {"temperature": 0.6, "num_predict": min(300, base_tokens)},
+        "💎 Pro (Beta)": {"temperature": 0.35, "num_predict": min(900, base_tokens + 300)},
+        "☄️ Ultra (Beta)": {"temperature": 0.6, "num_predict": min(1300, base_tokens + 500)},
+        "✍️ Escritor": {"temperature": 0.9, "num_predict": min(1000, base_tokens + 300)},
+        "🏫 Escola": {"temperature": 0.6, "num_predict": min(800, base_tokens + 200)},
+        "👨‍🏫 Professor": {"temperature": 0.4, "num_predict": min(1200, base_tokens + 400)},
+        "🎨 Designer": {"temperature": 0.95, "num_predict": min(900, base_tokens + 200)},
+        "💻 Codificador": {"temperature": 0.2, "num_predict": min(1000, base_tokens + 300)},
+        "🧩 Estratégias": {"temperature": 0.6, "num_predict": min(1100, base_tokens + 400)},
     }
-    opt = config.get(modo, {"temperature": 0.5, "num_predict": 200})
-    return chat_api(MODEL_IDS["LLaMA 3.3 70B"], full_prompt, opt)
+
+    opt = config.get(modo, {"temperature": 0.6, "num_predict": 800})
+    return chat_api(GROQ_MODEL, full_prompt, historico, opt)
 
 # ==============================
-# MULTI-CHAT / UI
+# ESTADO E INTERFACE
 # ==============================
 if "chats" not in st.session_state:
     st.session_state.chats = [{"nome": "Chat 1", "historico": []}]
@@ -191,28 +195,33 @@ def novo_chat():
 # ==============================
 with st.sidebar:
     st.title(f"🤖 PrimeBud — {usuario}")
-    st.markdown(f"**Plano:** {plano}")
-    st.link_button("🌐 GitHub", GITHUB_URL)
+    st.markdown(f"**Plano atual:** {plano}")
 
+    # Trocar plano depois do login
+    planos = ["Free", "Pro", "Ultra", "Trabalho", "Professor"]
+    novo_plano = st.selectbox("Alterar plano:", planos, index=planos.index(plano))
+    if st.button("💼 Atualizar plano"):
+        st.session_state.plano = novo_plano
+        st.session_state.usuarios[usuario]["plano"] = novo_plano
+        st.success(f"Plano alterado para {novo_plano} com sucesso!")
+        st.rerun()
+
+    st.link_button("🌐 GitHub", GITHUB_URL)
     st.divider()
+
     if st.button("➕ Novo chat"):
         novo_chat()
 
     nomes = [c["nome"] for c in st.session_state.chats]
-    idx = st.radio("Seus chats:", list(range(len(nomes))), index=st.session_state.chat_atual,
+    idx = st.radio("Seus chats:", list(range(len(nomes))),
+                   index=st.session_state.chat_atual,
                    format_func=lambda i: nomes[i])
     st.session_state.chat_atual = idx
 
     st.divider()
-    modos_por_plano = {
-        "Free": ["💬 Mini", "🍃 Econômico", "✍️ Escritor", "🏫 Escola"],
-        "Pro": ["⚡ Flash", "🔵 Normal", "💎 Pro (Beta)", "✍️ Escritor", "🏫 Escola"],
-        "Ultra": list(MODOS_DESC.keys()),
-        "Trabalho": ["👨‍🏫 Professor", "🎨 Designer", "💻 Codificador", "🧩 Estratégias", "✍️ Escritor"],
-        "Professor": ["👨‍🏫 Professor", "🏫 Escola", "✍️ Escritor"],
-    }
-    lista = modos_por_plano.get(plano, modos_por_plano["Ultra"])
-    modo = st.selectbox("Modo:", lista, index=0)
+    # Todos os modos básicos estão liberados
+    modos_base = list(MODOS_DESC.keys())
+    modo = st.selectbox("Modo:", modos_base, index=1)
     st.caption(MODOS_DESC.get(modo, ""))
 
 # ==============================
@@ -233,8 +242,8 @@ for m in chat["historico"]:
 msg = st.chat_input("Digite sua mensagem...")
 if msg:
     chat["historico"].append({"autor": "Você", "texto": msg})
-    with st.spinner("Processando..."):
-        resposta = gerar_resposta(modo, msg)
+    with st.spinner("🧠 Pensando..."):
+        resposta = gerar_resposta(modo, msg, chat["historico"])
     chat["historico"].append({"autor": "PrimeBud", "texto": resposta})
     st.rerun()
 
