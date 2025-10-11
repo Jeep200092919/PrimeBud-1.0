@@ -22,8 +22,10 @@ GITHUB_URL = "https://github.com/Jeep200092919/PrimeBud-1.0"
 # LOGIN / CONTAS
 # ==============================
 if "usuarios" not in st.session_state:
-    st.session_state.usuarios =
-    
+    # Apenas conta de teste padrão
+    st.session_state.usuarios = {
+        "teste": {"senha": "0000", "plano": "Free"},
+    }
 
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
@@ -67,6 +69,7 @@ if st.session_state.usuario is None:
 
     with tabs[2]:
         if st.button("Entrar como Convidado (Ultra)"):
+
             st.session_state.usuario = "Convidado"
             st.session_state.plano = "Ultra"
             st.success("Entrou como convidado — Plano Ultra liberado.")
