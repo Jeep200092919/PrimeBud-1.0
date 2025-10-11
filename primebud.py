@@ -22,7 +22,6 @@ GITHUB_URL = "https://github.com/Jeep200092919/PrimeBud-1.0"
 # LOGIN / CONTAS
 # ==============================
 if "usuarios" not in st.session_state:
-    # Apenas conta de teste padrão
     st.session_state.usuarios = {
         "teste": {"senha": "0000", "plano": "Free"},
     }
@@ -69,7 +68,6 @@ if st.session_state.usuario is None:
 
     with tabs[2]:
         if st.button("Entrar como Convidado (Ultra)"):
-
             st.session_state.usuario = "Convidado"
             st.session_state.plano = "Ultra"
             st.success("Entrou como convidado — Plano Ultra liberado.")
@@ -222,9 +220,17 @@ with st.sidebar:
     st.session_state.chat_atual = idx
 
     st.divider()
-    # Todos os modos básicos estão liberados
-    modos_base = list(MODOS_DESC.keys())
-    modo = st.selectbox("Modo:", modos_base, index=1)
+    # Modos liberados conforme plano
+    modos_por_plano = {
+        "Free": ["💬 Mini", "🍃 Econômico", "✍️ Escritor", "🏫 Escola", "🔵 Normal"],
+        "Pro": ["⚡ Flash", "🔵 Normal", "💎 Pro (Beta)", "✍️ Escritor", "🏫 Escola"],
+        "Ultra": list(MODOS_DESC.keys()),
+        "Trabalho": ["👨‍🏫 Professor", "🎨 Designer", "💻 Codificador", "🧩 Estratégias", "✍️ Escritor", "🏫 Escola"],
+        "Professor": ["👨‍🏫 Professor", "🏫 Escola", "✍️ Escritor", "🔵 Normal"],
+    }
+
+    modos_disponiveis = modos_por_plano.get(st.session_state.plano, list(MODOS_DESC.keys()))
+    modo = st.selectbox("Modo:", modos_disponiveis, index=0)
     st.caption(MODOS_DESC.get(modo, ""))
 
 # ==============================
