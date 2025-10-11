@@ -2,17 +2,16 @@ import streamlit as st
 import requests
 import json
 import os
+import time
 
 # ============================================
 # CONFIGURAÇÕES INICIAIS
 # ============================================
 st.set_page_config(page_title="PrimeBud 1.0 — GPT-OSS 120B", page_icon="🧠", layout="wide")
 
-# Endpoints
 OLLAMA_URL = "http://localhost:11434/api/chat"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Secrets / Env
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
 GROQ_MODEL = st.secrets.get("GROQ_MODEL", os.getenv("GROQ_MODEL", "gpt-oss-120b"))
 
@@ -22,9 +21,7 @@ GITHUB_URL = "https://github.com/Jeep200092919/PrimeBud-1.0"
 # SISTEMA DE LOGIN
 # ============================================
 if "usuarios" not in st.session_state:
-    st.session_state.usuarios = {
-        "teste": {"senha": "0000", "plano": "Free"},
-    }
+    st.session_state.usuarios = {"teste": {"senha": "0000", "plano": "Free"}}
 
 if "usuario" not in st.session_state:
     st.session_state.usuario = None
@@ -36,10 +33,9 @@ if st.session_state.usuario is None:
     st.link_button("Ver no GitHub", GITHUB_URL)
     st.divider()
 
-    aba = st.tabs(["Entrar", "Criar conta", "Convidado (Ultra)"])
+    abas = st.tabs(["Entrar", "Criar conta", "Convidado (Ultra)"])
 
-    # Entrar
-    with aba[0]:
+    with abas[0]:
         u = st.text_input("Usuário")
         p = st.text_input("Senha", type="password")
         if st.button("Entrar"):
@@ -47,13 +43,11 @@ if st.session_state.usuario is None:
             if u in db and db[u]["senha"] == p:
                 st.session_state.usuario = u
                 st.session_state.plano = db[u]["plano"]
-                st.success(f"Bem-vindo, {u}.")
                 st.rerun()
             else:
                 st.error("Usuário ou senha incorretos.")
 
-    # Criar conta
-    with aba[1]:
+    with abas[1]:
         novo_u = st.text_input("Novo usuário")
         nova_s = st.text_input("Nova senha", type="password")
         plano_i = st.selectbox("Plano inicial", ["Free", "Pro", "Ultra", "Trabalho", "Professor"])
@@ -65,15 +59,12 @@ if st.session_state.usuario is None:
                 db[novo_u] = {"senha": nova_s, "plano": plano_i}
                 st.session_state.usuario = novo_u
                 st.session_state.plano = plano_i
-                st.success(f"Conta criada e login automático como {novo_u} ({plano_i}).")
                 st.rerun()
 
-    # Convidado
-    with aba[2]:
+    with abas[2]:
         if st.button("Entrar como Convidado (Ultra)"):
             st.session_state.usuario = "Convidado"
             st.session_state.plano = "Ultra"
-            st.success("Entrou como convidado — Plano Ultra liberado.")
             st.rerun()
     st.stop()
 
@@ -86,92 +77,71 @@ plano = st.session_state.plano
 def usar_groq():
     return bool(GROQ_API_KEY)
 
-def _map_options_for_openai_like(options=None):
-    options = options or {}
-    return {
-        "temperature": options.get("temperature", 0.35),
-        "top_p": options.get("top_p", 0.9),
-        "max_tokens": options.get("num_predict", 800),
-    }
+def chat_api(model, messages, options=None, timeout=120):
+    """Chamada direta à API, sem Stream."""
+    if usar_groq():
+        payload = {"model": model, "messages": messages, "stream": False}
+        if options:
+            payload.update(options)
+        headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+        try:
+            r = requests.post(GROQ_URL, headers=headers, json=payload, timeout=timeout)
+            data = r.json()
+            return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            return f"[Erro Groq] {e}"
+    else:
+        payload = {"model": model, "stream": False, "messages": messages}
+        if options:
+            payload["options"] = options
+        try:
+            r = requests.post(OLLAMA_URL, json=payload, timeout=timeout)
+            data = r.json()
+            return data.get("message", {}).get("content", "[Erro Ollama]")
+        except Exception as e:
+            return f"[Erro Ollama] {e}"
 
-def chat_api(model, prompt, historico, options=None, timeout=120):
-    """Envia histórico completo do chat."""
-    mensagens = [{
-        "role": "system",
-        "content": (
-            "Você é o PrimeBud — uma IA analítica e séria. "
-            "Mantenha tom técnico, racional e objetivo. "
-            "Explique o raciocínio de forma lógica quando necessário. "
-            "Evite informalidades e emojis."
-        )
-    }]
+# ============================================
+# MODOS
+# ============================================
+MODOS_DESC = {
+    "⚡ Flash": "Respostas curtas e diretas.",
+    "🔵 Normal": "Respostas equilibradas e coerentes.",
+    "🍃 Econômico": "Respostas rápidas e eficientes.",
+    "💬 Mini": "Conversas simples e objetivas.",
+    "💎 Pro (Beta)": "Código + breve explicação.",
+    "☄️ Ultra (Beta)": "Respostas longas e analíticas.",
+    "✍️ Escritor": "Textos criativos e claros.",
+    "🏫 Escola": "Explicações didáticas e acessíveis.",
+    "👨‍🏫 Professor": "Explicações detalhadas e exemplos.",
+    "🎨 Designer": "Ideias visuais e UI/UX.",
+    "💻 Codificador": "Código limpo e comentado.",
+    "🧩 Estratégias": "Planos com metas e raciocínio tático.",
+}
+
+# ============================================
+# GERAÇÃO DE RESPOSTA
+# ============================================
+def gerar_resposta(modo, msg, historico):
+    base = MODOS_DESC.get(modo, "Responda com clareza e objetividade.")
+    # Fase 1: pensamento interno
+    pensamento_prompt = [
+        {"role": "system", "content": "Explique brevemente seu raciocínio interno, de forma lógica e profissional. Não formule a resposta final, apenas o raciocínio."},
+        {"role": "user", "content": f"{msg}\n\n[MODO ATUAL: {modo}] {base}"}
+    ]
+    pensamento = chat_api(GROQ_MODEL, pensamento_prompt, {"temperature": 0.25, "max_tokens": 400})
+
+    # Fase 2: resposta final
+    mensagens = [{"role": "system", "content": "Você é o PrimeBud — uma IA analítica, objetiva e profissional."}]
     for m in historico:
         if m["autor"] == "Você":
             mensagens.append({"role": "user", "content": m["texto"]})
         else:
             mensagens.append({"role": "assistant", "content": m["texto"]})
-    mensagens.append({"role": "user", "content": prompt})
+    mensagens.append({"role": "user", "content": msg})
+    resposta_final = chat_api(GROQ_MODEL, mensagens, {"temperature": 0.35, "max_tokens": 1200})
 
-    if usar_groq():
-        payload = {
-            "model": GROQ_MODEL,
-            "messages": mensagens,
-            "stream": False,
-            **_map_options_for_openai_like(options),
-        }
-        headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-        r = requests.post(GROQ_URL, headers=headers, json=payload, timeout=timeout)
-        try:
-            data = r.json()
-            return data["choices"][0]["message"]["content"]
-        except Exception:
-            return f"Erro Groq: {r.text[:300]}"
-
-    payload = {"model": model, "stream": False, "messages": mensagens}
-    if options:
-        payload["options"] = options
-    r = requests.post(OLLAMA_URL, json=payload, timeout=timeout)
-    data = r.json()
-    return data.get("message", {}).get("content", "Erro Ollama.")
-
-# ============================================
-# MODOS CLÁSSICOS
-# ============================================
-MODOS_DESC = {
-    "⚡ Flash": "Respostas curtas e diretas.",
-    "🔵 Normal": "Respostas equilibradas e coerentes.",
-    "🍃 Econômico": "Respostas rápidas com foco em economia de tokens.",
-    "💬 Mini": "Conversas leves e simples.",
-    "💎 Pro (Beta)": "Código + explicação curta.",
-    "☄️ Ultra (Beta)": "Respostas longas e analíticas.",
-    "✍️ Escritor": "Textos criativos e descritivos.",
-    "🏫 Escola": "Explicações didáticas e simples.",
-    "👨‍🏫 Professor": "Explicações detalhadas com exemplos.",
-    "🎨 Designer": "Sugestões de design e estética.",
-    "💻 Codificador": "Código otimizado com explicação técnica.",
-    "🧩 Estratégias": "Planos detalhados e estruturados.",
-}
-
-def gerar_resposta(modo, msg, historico):
-    base = MODOS_DESC.get(modo, "Responda de forma clara e precisa.")
-    full_prompt = f"[Modo: {modo}]\n{base}\n\n{msg}"
-
-    config = {
-        "⚡ Flash": {"temperature": 0.2, "num_predict": 200},
-        "🔵 Normal": {"temperature": 0.35, "num_predict": 800},
-        "🍃 Econômico": {"temperature": 0.3, "num_predict": 400},
-        "💬 Mini": {"temperature": 0.5, "num_predict": 300},
-        "💎 Pro (Beta)": {"temperature": 0.25, "num_predict": 1000},
-        "☄️ Ultra (Beta)": {"temperature": 0.4, "num_predict": 1500},
-        "✍️ Escritor": {"temperature": 0.8, "num_predict": 1200},
-        "🏫 Escola": {"temperature": 0.5, "num_predict": 1000},
-        "👨‍🏫 Professor": {"temperature": 0.35, "num_predict": 1200},
-        "🎨 Designer": {"temperature": 0.7, "num_predict": 900},
-        "💻 Codificador": {"temperature": 0.2, "num_predict": 1100},
-        "🧩 Estratégias": {"temperature": 0.4, "num_predict": 1200},
-    }
-    opt = config.get(modo, {"temperature": 0.35, "num_predict": 800})
-    return chat_api(GROQ_MODEL, full_prompt, historico, opt)
+    return pensamento, resposta_final
 
 # ============================================
 # ESTADO DE CHAT
@@ -193,13 +163,12 @@ def novo_chat():
 with st.sidebar:
     st.title(f"PrimeBud — {usuario}")
     st.caption(f"Plano atual: {plano}")
-
     planos = ["Free", "Pro", "Ultra", "Trabalho", "Professor"]
     novo_plano = st.selectbox("Alterar plano", planos, index=planos.index(plano))
     if st.button("Atualizar plano"):
         st.session_state.plano = novo_plano
         st.session_state.usuarios[usuario]["plano"] = novo_plano
-        st.success(f"Plano alterado para {novo_plano}.")
+        st.success("Plano alterado com sucesso.")
         st.rerun()
 
     st.link_button("Repositório GitHub", GITHUB_URL)
@@ -209,7 +178,7 @@ with st.sidebar:
         novo_chat()
 
     nomes = [c["nome"] for c in st.session_state.chats]
-    idx = st.radio("Seus chats", list(range(len(nomes))),
+    idx = st.radio("Chats ativos", list(range(len(nomes))),
                    index=st.session_state.chat_atual,
                    format_func=lambda i: nomes[i])
     st.session_state.chat_atual = idx
@@ -219,13 +188,13 @@ with st.sidebar:
     st.caption(MODOS_DESC.get(modo, ""))
 
 # ============================================
-# ÁREA PRINCIPAL
+# INTERFACE PRINCIPAL
 # ============================================
 chat = st.session_state.chats[st.session_state.chat_atual]
 st.markdown(f"### Sessão: {chat['nome']}")
 
 for m in chat["historico"]:
-    bg = "#1f1f1f" if m["autor"] == "Você" else "#2b2b2b"
+    bg = "#181818" if m["autor"] == "Você" else "#242424"
     st.markdown(
         f"<div style='background:{bg};color:#eaeaea;padding:10px;border-radius:6px;margin:5px 0;'>"
         f"<b>{m['autor']}:</b><br>{m['texto']}</div>",
@@ -235,8 +204,11 @@ for m in chat["historico"]:
 msg = st.chat_input("Digite sua mensagem...")
 if msg:
     chat["historico"].append({"autor": "Você", "texto": msg})
-    with st.spinner("Analisando e gerando resposta..."):
-        resposta = gerar_resposta(modo, msg, chat["historico"])
+    with st.spinner("Analisando contexto e raciocinando..."):
+        pensamento, resposta = gerar_resposta(modo, msg, chat["historico"])
+
+    st.markdown(f"<div style='background:#2b2b2b;color:#cfcfcf;padding:10px;border-radius:6px;margin:5px 0;'><b>Pensamento interno:</b><br>{pensamento}</div>", unsafe_allow_html=True)
+    time.sleep(0.8)
     chat["historico"].append({"autor": "PrimeBud", "texto": resposta})
     st.rerun()
 
