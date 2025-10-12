@@ -155,6 +155,12 @@ with st.sidebar:
 # ============================================================
 # FUNÇÕES GROQ
 # ============================================================
+def corrigir_acentos(texto):
+    try:
+        return texto.encode("latin1").decode("utf-8")
+    except Exception:
+        return texto
+
 def chat_stream(messages, temperature=0.35, max_tokens=4000, timeout=300):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
     payload = {
@@ -167,6 +173,7 @@ def chat_stream(messages, temperature=0.35, max_tokens=4000, timeout=300):
     }
     with requests.post(GROQ_URL, headers=headers, json=payload, stream=True, timeout=timeout) as r:
         r.raise_for_status()
+        r.encoding = "utf-8"
         for line in r.iter_lines(decode_unicode=True):
             if not line or not line.startswith("data: "):
                 continue
@@ -177,7 +184,7 @@ def chat_stream(messages, temperature=0.35, max_tokens=4000, timeout=300):
                 obj = json.loads(data)
                 delta = obj["choices"][0]["delta"].get("content", "")
                 if delta:
-                    yield delta
+                    yield corrigir_acentos(delta)
             except:
                 continue
 
@@ -192,8 +199,10 @@ def chat_once(messages, temperature=0.35, max_tokens=400, timeout=120):
     }
     r = requests.post(GROQ_URL, headers=headers, json=payload, timeout=timeout)
     r.raise_for_status()
+    r.encoding = "utf-8"
     data = r.json()
-    return data["choices"][0]["message"]["content"]
+    content = data["choices"][0]["message"]["content"]
+    return corrigir_acentos(content)
 
 # ============================================================
 # INTERFACE PRINCIPAL
