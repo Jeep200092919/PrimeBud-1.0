@@ -72,7 +72,7 @@ if st.session_state.usuario is None:
             st.session_state.usuario = "Convidado"
             st.session_state.plano = "Ultra"
             st.success("Entrou como Convidado (Ultra).")
-            st.experimental_rerun()
+         st.rerun()
 
     st.stop()
 
@@ -256,3 +256,4 @@ if msg:
 
     chat["historico"].append({"autor": "PrimeBud", "texto": full})
     st.session_state.chats[st.session_state.chat_atual]["historico"] = chat["histórico"]
+
