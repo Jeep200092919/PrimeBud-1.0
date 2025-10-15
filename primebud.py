@@ -34,7 +34,7 @@ if "plano" not in st.session_state:
     st.session_state.plano = None
 
 if st.session_state.usuario is None:
-    st.title("PrimeBud 1.0 — GPT-OSS 120B Ultimate")
+    st.title("PrimeBud 1.0 — GPT-OSS 120B")
     abas = st.tabs(["Entrar", "Criar Conta", "Convidado"])
 
     with abas[0]:
@@ -81,23 +81,23 @@ plano = st.session_state.plano
 MODOS_DESC = {
     "⚡ Flash": "Respostas curtas e diretas.",
     "🔵 Normal": "Respostas equilibradas e naturais.",
-    "🍃 Econômico": "Rápido e com menos tokens.",
+    "🍃 Econômico": "Rápido e leve.",
     "💬 Mini": "Conversas simples.",
-    "💎 Pro": "Código + breve explicação.",
-    "☄️ Ultra": "Raciocínio detalhado e extenso.",
-    "✍️ Escritor": "Textos criativos e bem escritos.",
-    "🏫 Escola": "Explicações didáticas e objetivas.",
-    "👨‍🏫 Professor": "Explicações com exemplos e contexto.",
-    "🎨 Designer": "Ideias visuais e conceitos criativos.",
-    "💻 Codificador": "Códigos bem estruturados e comentados.",
-    "🧩 Estratégias": "Planos e análises práticas.",
-    "🖼️ Imagem (Beta)": "Cria imagens detalhadas a partir do texto."
+    "💎 Pro": "Código + explicação curta.",
+    "☄️ Ultra": "Raciocínio extenso e detalhado.",
+    "✍️ Escritor": "Textos criativos e coerentes.",
+    "🏫 Escola": "Explicações didáticas.",
+    "👨‍🏫 Professor": "Explicações com exemplos.",
+    "🎨 Designer": "Ideias visuais e UI/UX.",
+    "💻 Codificador": "Códigos limpos e comentados.",
+    "🧩 Estratégias": "Planos e soluções práticas.",
+    "🖼️ Imagem (Beta)": "Cria imagens com base em descrições."
 }
 
 SYSTEM_PROMPT = (
-    "Você é o PrimeBud — uma IA profissional e analítica. "
-    "Responda com clareza e complete sempre o raciocínio sem cortar. "
-    "Se for pedido código, formate corretamente."
+    "Você é o PrimeBud — uma IA profissional, analítica e objetiva. "
+    "Responda com clareza e sempre complete o raciocínio sem cortar. "
+    "Use formatação limpa quando for código."
 )
 
 # ============================================================
@@ -169,13 +169,21 @@ def chat_stream(messages, temperature=0.6, max_tokens=16000, timeout=600):
                 continue
 
 def gerar_imagem(prompt, qtd=1, tamanho="1024x1024"):
-    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+    """Gera imagem compatível com chaves sk-proj e sk antigas"""
+    key = OPENAI_API_KEY.strip()
+    headers = {"Authorization": f"Bearer {key}"}
+
+    # Se for uma chave "sk-proj", adiciona o cabeçalho do projeto
+    if key.startswith("sk-proj-"):
+        headers["OpenAI-Project"] = "default"  # ou substitua pelo seu Project ID
+
     payload = {"model": "gpt-image-1", "prompt": prompt, "n": qtd, "size": tamanho}
     r = requests.post(IMAGE_API, headers=headers, json=payload)
     if r.status_code != 200:
-        return [f"Erro: {r.text}"]
+        st.error(f"Erro da OpenAI: {r.text}")
+        return []
     data = r.json()
-    return [d["url"] for d in data["data"]]
+    return [d["url"] for d in data.get("data", [])]
 
 # ============================================================
 # ÁREA PRINCIPAL
@@ -196,6 +204,7 @@ msg = st.chat_input("Digite sua mensagem...")
 if msg:
     chat["historico"].append({"autor": "Você", "texto": msg})
 
+    # --- MODO IMAGEM ---
     if modo == "🖼️ Imagem (Beta)":
         st.divider()
         st.subheader("🖼️ Gerador de Imagens — Modo Beta")
@@ -205,13 +214,17 @@ if msg:
         if st.button("🎨 Gerar Imagem Agora"):
             with st.spinner("Gerando imagem..."):
                 urls = gerar_imagem(msg, qtd=qtd, tamanho=tamanho)
-                for u in urls:
-                    if "http" in u:
-                        st.image(u, caption=f"Imagem gerada ({tamanho})", use_column_width=True)
-                        chat["historico"].append({"autor": "PrimeBud", "texto": f"[Imagem gerada: {u}]"})
-                    else:
-                        st.error(u)
+                if not urls:
+                    st.error("❌ Falha ao gerar imagem.")
+                else:
+                    for u in urls:
+                        if "http" in u:
+                            st.image(u, caption=f"Imagem gerada ({tamanho})", use_column_width=True)
+                            chat["historico"].append({"autor": "PrimeBud", "texto": f"[Imagem gerada: {u}]"})
+                        else:
+                            st.error(u)
 
+    # --- MODO TEXTO ---
     else:
         with st.spinner("💭 Processando resposta..."):
             mensagens = [{"role": "system", "content": SYSTEM_PROMPT}]
