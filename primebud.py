@@ -7,7 +7,7 @@ import os
 # CONFIGURAÇÕES GERAIS
 # ============================================================
 st.set_page_config(
-    page_title="PrimeBud 1.0 — GPT-OSS 120B + Imagens Pro",
+    page_title="PrimeBud 1.0 — GPT-OSS 120B + Imagens",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -24,7 +24,7 @@ IMAGE_API = "https://api.openai.com/v1/images/generations"
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
 
 # ============================================================
-# INTERFACE DE LOGIN
+# LOGIN / CONTAS
 # ============================================================
 if "usuarios" not in st.session_state:
     st.session_state.usuarios = {}
@@ -34,7 +34,7 @@ if "plano" not in st.session_state:
     st.session_state.plano = None
 
 if st.session_state.usuario is None:
-    st.title("PrimeBud 1.0 — GPT-OSS 120B Pro")
+    st.title("PrimeBud 1.0 — GPT-OSS 120B Ultimate")
     abas = st.tabs(["Entrar", "Criar Conta", "Convidado"])
 
     with abas[0]:
@@ -52,7 +52,7 @@ if st.session_state.usuario is None:
     with abas[1]:
         novo_u = st.text_input("Novo usuário")
         nova_s = st.text_input("Nova senha", type="password")
-        plano_i = st.selectbox("Plano", ["Free", "Pro", "Ultra", "Professor"])
+        plano_i = st.selectbox("Plano", ["Free", "Pro", "Ultra", "Trabalho", "Professor"])
         if st.button("Criar conta"):
             db = st.session_state.usuarios
             if novo_u in db:
@@ -76,23 +76,32 @@ usuario = st.session_state.usuario
 plano = st.session_state.plano
 
 # ============================================================
-# MODOS
+# MODOS COMPLETOS
 # ============================================================
 MODOS_DESC = {
-    "🔵 Normal": "Respostas equilibradas e completas.",
-    "☄️ Ultra": "Raciocínio extenso e analítico.",
-    "💻 Codificador": "Gera e explica códigos longos.",
-    "🧠 Explicador": "Explicações didáticas e organizadas.",
-    "🖼️ Imagem (Beta)": "Cria imagens detalhadas a partir de descrições de texto."
+    "⚡ Flash": "Respostas curtas e diretas.",
+    "🔵 Normal": "Respostas equilibradas e naturais.",
+    "🍃 Econômico": "Rápido e com menos tokens.",
+    "💬 Mini": "Conversas simples.",
+    "💎 Pro": "Código + breve explicação.",
+    "☄️ Ultra": "Raciocínio detalhado e extenso.",
+    "✍️ Escritor": "Textos criativos e bem escritos.",
+    "🏫 Escola": "Explicações didáticas e objetivas.",
+    "👨‍🏫 Professor": "Explicações com exemplos e contexto.",
+    "🎨 Designer": "Ideias visuais e conceitos criativos.",
+    "💻 Codificador": "Códigos bem estruturados e comentados.",
+    "🧩 Estratégias": "Planos e análises práticas.",
+    "🖼️ Imagem (Beta)": "Cria imagens detalhadas a partir do texto."
 }
 
 SYSTEM_PROMPT = (
-    "Você é o PrimeBud — uma IA analítica, lógica e objetiva. "
-    "Responda com clareza e complete sempre o raciocínio sem cortar."
+    "Você é o PrimeBud — uma IA profissional e analítica. "
+    "Responda com clareza e complete sempre o raciocínio sem cortar. "
+    "Se for pedido código, formate corretamente."
 )
 
 # ============================================================
-# HISTÓRICO DE CHAT
+# HISTÓRICO
 # ============================================================
 if "chats" not in st.session_state:
     st.session_state.chats = [{"nome": "Chat 1", "historico": []}]
@@ -110,7 +119,7 @@ def novo_chat():
 # ============================================================
 with st.sidebar:
     st.title(f"👤 Usuário: {usuario}")
-    st.caption(f"Plano atual: {plano}")
+    st.caption(f"Plano: {plano}")
     if st.button("➕ Novo Chat"):
         novo_chat()
 
@@ -121,19 +130,19 @@ with st.sidebar:
     st.session_state.chat_atual = idx
 
     st.divider()
-    modo = st.selectbox("Modo", list(MODOS_DESC.keys()), index=0)
+    modo = st.selectbox("Modo", list(MODOS_DESC.keys()), index=1)
     st.caption(MODOS_DESC[modo])
 
 # ============================================================
 # FUNÇÕES PRINCIPAIS
 # ============================================================
-def corrigir_acentos(texto):
+def corrigir_acentos(txt):
     try:
-        return texto.encode("latin1").decode("utf-8")
+        return txt.encode("latin1").decode("utf-8")
     except Exception:
-        return texto
+        return txt
 
-def chat_stream(messages, temperature=0.5, max_tokens=16000, timeout=600):
+def chat_stream(messages, temperature=0.6, max_tokens=16000, timeout=600):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
     payload = {
         "model": GROQ_MODEL,
@@ -141,11 +150,10 @@ def chat_stream(messages, temperature=0.5, max_tokens=16000, timeout=600):
         "temperature": temperature,
         "top_p": 0.9,
         "stream": True,
-        "max_tokens": max_tokens,
+        "max_tokens": max_tokens
     }
     with requests.post(GROQ_URL, headers=headers, json=payload, stream=True, timeout=timeout) as r:
         r.raise_for_status()
-        r.encoding = "utf-8"
         for line in r.iter_lines(decode_unicode=True):
             if not line or not line.startswith("data: "):
                 continue
@@ -160,16 +168,14 @@ def chat_stream(messages, temperature=0.5, max_tokens=16000, timeout=600):
             except:
                 continue
 
-def gerar_imagem(prompt: str, qtd: int = 1, tamanho: str = "1024x1024"):
-    """Gera imagem com qualidade alta via OpenAI"""
+def gerar_imagem(prompt, qtd=1, tamanho="1024x1024"):
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
     payload = {"model": "gpt-image-1", "prompt": prompt, "n": qtd, "size": tamanho}
     r = requests.post(IMAGE_API, headers=headers, json=payload)
     if r.status_code != 200:
         return [f"Erro: {r.text}"]
     data = r.json()
-    urls = [item["url"] for item in data["data"]]
-    return urls
+    return [d["url"] for d in data["data"]]
 
 # ============================================================
 # ÁREA PRINCIPAL
@@ -187,26 +193,25 @@ for m in chat["historico"]:
 
 msg = st.chat_input("Digite sua mensagem...")
 
-# ============================================================
-# CHAT NORMAL OU IMAGEM
-# ============================================================
 if msg:
     chat["historico"].append({"autor": "Você", "texto": msg})
 
-    # MODO IMAGEM
     if modo == "🖼️ Imagem (Beta)":
-        qtd = st.number_input("Quantidade de imagens", min_value=1, max_value=4, value=1)
-        tamanho = st.selectbox("Tamanho", ["512x512", "1024x1024", "2048x2048"], index=1)
-        gerar = st.button("🎨 Gerar Imagem")
-        if gerar:
-            with st.spinner("🎨 Gerando imagem de alta qualidade..."):
+        st.divider()
+        st.subheader("🖼️ Gerador de Imagens — Modo Beta")
+        qtd = st.slider("Quantidade", 1, 4, 1)
+        tamanho = st.selectbox("Tamanho da imagem", ["512x512", "1024x1024", "2048x2048"], index=1)
+
+        if st.button("🎨 Gerar Imagem Agora"):
+            with st.spinner("Gerando imagem..."):
                 urls = gerar_imagem(msg, qtd=qtd, tamanho=tamanho)
                 for u in urls:
                     if "http" in u:
-                        st.image(u, caption=f"Imagem criada — {tamanho}", use_column_width=True)
+                        st.image(u, caption=f"Imagem gerada ({tamanho})", use_column_width=True)
                         chat["historico"].append({"autor": "PrimeBud", "texto": f"[Imagem gerada: {u}]"})
                     else:
                         st.error(u)
+
     else:
         with st.spinner("💭 Processando resposta..."):
             mensagens = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -225,7 +230,7 @@ if msg:
                         unsafe_allow_html=True
                     )
             except Exception as e:
-                resposta_final = f"[Erro: {e}]"
+                resposta_final = f"[Erro ao gerar resposta: {e}]"
                 st.error(resposta_final)
 
             chat["historico"].append({"autor": "PrimeBud", "texto": resposta_final})
