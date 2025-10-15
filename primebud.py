@@ -1,16 +1,14 @@
 # =====================================
-# 🤖 PRIMEBUD 1.0 - COMPLETO E CORRIGIDO
+# 🤖 PRIMEBUD 1.0 - GROQ + GPT-OSS + GPT-IMAGE-1
 # =====================================
 
 import streamlit as st
-from openai import OpenAI
+import json, os, hashlib
 from datetime import datetime
-import json
-import os
-import hashlib
 from io import BytesIO
 from PIL import Image
 import base64
+import requests
 
 # =============================
 # CONFIGURAÇÕES INICIAIS
@@ -18,8 +16,7 @@ import base64
 st.set_page_config(
     page_title="PrimeBud 1.0",
     page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 # =============================
@@ -37,164 +34,124 @@ def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=4)
 
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+def hash_password(pwd):
+    return hashlib.sha256(pwd.encode()).hexdigest()
 
 users = load_users()
 
 # =============================
-# LOGIN E REGISTRO
+# LOGIN
 # =============================
 st.sidebar.title("🔐 Login do PrimeBud")
-
-menu = st.sidebar.radio("Escolha uma opção", ["Entrar", "Registrar"])
+menu = st.sidebar.radio("Menu", ["Entrar", "Registrar"])
 
 if menu == "Registrar":
-    st.sidebar.subheader("Criar nova conta")
-    new_user = st.sidebar.text_input("Usuário")
-    new_pass = st.sidebar.text_input("Senha", type="password")
+    user = st.sidebar.text_input("Usuário")
+    pwd = st.sidebar.text_input("Senha", type="password")
     if st.sidebar.button("Registrar"):
-        if new_user in users:
-            st.sidebar.error("Usuário já existe!")
+        if user in users:
+            st.sidebar.error("Usuário já existe.")
         else:
-            users[new_user] = hash_password(new_pass)
+            users[user] = hash_password(pwd)
             save_users(users)
-            st.sidebar.success("Conta criada com sucesso! Faça login para continuar.")
+            st.sidebar.success("Conta criada com sucesso!")
 
 if menu == "Entrar":
-    st.sidebar.subheader("Acesso")
-    username = st.sidebar.text_input("Usuário")
-    password = st.sidebar.text_input("Senha", type="password")
+    user = st.sidebar.text_input("Usuário")
+    pwd = st.sidebar.text_input("Senha", type="password")
     if st.sidebar.button("Entrar"):
-        if username in users and users[username] == hash_password(password):
+        if user in users and users[user] == hash_password(pwd):
             st.session_state["logged_in"] = True
-            st.session_state["username"] = username
-            st.sidebar.success(f"Bem-vindo(a), {username}!")
+            st.session_state["user"] = user
         else:
             st.sidebar.error("Usuário ou senha incorretos.")
 
 # =============================
-# ÁREA PRINCIPAL (APÓS LOGIN)
+# INTERFACE PRINCIPAL
 # =============================
 if "logged_in" in st.session_state and st.session_state["logged_in"]:
     st.title("🤖 PrimeBud 1.0")
-    st.markdown("**Assistente Inteligente Integrado**")
+    modo = st.sidebar.selectbox("Modo de operação", [
+        "Chat", "Imagem", "Professor", "Designer", "Codificador", "Estratégias"
+    ])
 
-    # Configuração da API
-    if "OPENAI_API_KEY" not in st.secrets:
-        st.warning("Adicione sua chave da OpenAI no arquivo secrets.toml!")
-    else:
-        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-    # Modo de operação
-    modo = st.sidebar.selectbox(
-        "Escolha o modo de operação:",
-        ["Chat", "Imagem", "Professor", "Designer", "Codificador", "Estratégias"]
-    )
-
-    # =========================================
-    # MODO CHAT NORMAL
-    # =========================================
+    # ==================================================
+    # MODO CHAT / GROQ / GPT-OSS 120B
+    # ==================================================
     if modo == "Chat":
-        st.subheader("💬 Conversa Inteligente")
-
-        user_input = st.text_area("Digite sua mensagem:")
+        st.subheader("💬 Conversa Inteligente (Groq/GPT-OSS 120B)")
+        prompt = st.text_area("Digite sua mensagem:")
         if st.button("Enviar"):
-            if user_input.strip():
+            if prompt.strip():
                 with st.spinner("Gerando resposta..."):
-                    resposta = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[{"role": "user", "content": user_input}]
-                    )
-                    st.markdown(resposta.choices[0].message.content)
+                    try:
+                        response = requests.post(
+                            "http://localhost:8000/v1/chat/completions",
+                            headers={"Content-Type": "application/json"},
+                            json={
+                                "model": "gpt-oss-120b",
+                                "messages": [{"role": "user", "content": prompt}],
+                                "temperature": 0.7
+                            }
+                        )
+                        data = response.json()
+                        st.markdown(data["choices"][0]["message"]["content"])
+                    except Exception as e:
+                        st.error(f"Erro na conexão com o modelo local: {e}")
 
-    # =========================================
-    # MODO GERADOR DE IMAGEM
-    # =========================================
+    # ==================================================
+    # MODO IMAGEM (OpenAI opcional)
+    # ==================================================
     elif modo == "Imagem":
-        st.subheader("🎨 Criador de Imagens (GPT-Image-1)")
+        st.subheader("🎨 Gerador de Imagens (gpt-image-1)")
+        prompt = st.text_input("Descrição da imagem:", "um boneco palito sorrindo")
+        size = st.selectbox("Tamanho", ["256x256", "512x512", "1024x1024"])
 
-        prompt = st.text_input("Descreva a imagem que deseja criar:", "um boneco palito sorrindo")
-        tamanho = st.selectbox("Tamanho da imagem:", ["256x256", "512x512", "1024x1024"])
-
-        if st.button("🎨 Criar Imagem"):
+        if st.button("Criar Imagem"):
             try:
-                with st.spinner("Gerando imagem..."):
+                # Import protegido — só tenta se a lib existir
+                try:
+                    from openai import OpenAI
+                    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
                     result = client.images.generate(
                         model="gpt-image-1",
                         prompt=prompt,
-                        size=tamanho
+                        size=size
                     )
                     image_base64 = result.data[0].b64_json
                     image_bytes = base64.b64decode(image_base64)
-                    image = Image.open(BytesIO(image_bytes))
-                    st.image(image, caption="Imagem gerada com sucesso!", use_column_width=True)
+                    img = Image.open(BytesIO(image_bytes))
+                    st.image(img, caption="Imagem gerada com sucesso!", use_column_width=True)
+                except ModuleNotFoundError:
+                    st.error("⚠️ O módulo 'openai' não está instalado. "
+                             "Execute `pip install openai` para habilitar o gerador de imagens.")
             except Exception as e:
                 st.error(f"Erro ao gerar imagem: {e}")
 
-    # =========================================
-    # MODO PROFESSOR
-    # =========================================
-    elif modo == "Professor":
-        st.subheader("🧑‍🏫 Modo Professor")
-        tema = st.text_input("Tema da aula:")
-        if st.button("Gerar Plano de Aula"):
-            resposta = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "Você é um professor especialista em planejamento de aulas criativas."},
-                    {"role": "user", "content": f"Crie um plano de aula sobre {tema} para alunos do ensino fundamental."}
-                ]
-            )
-            st.markdown(resposta.choices[0].message.content)
-
-    # =========================================
-    # MODO DESIGNER
-    # =========================================
-    elif modo == "Designer":
-        st.subheader("🎨 Modo Designer Criativo")
-        descricao = st.text_area("Descreva o design que deseja criar:")
-        if st.button("Gerar Ideia de Design"):
-            resposta = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "Você é um designer criativo especializado em ideias visuais."},
-                    {"role": "user", "content": descricao}
-                ]
-            )
-            st.markdown(resposta.choices[0].message.content)
-
-    # =========================================
-    # MODO CODIFICADOR
-    # =========================================
-    elif modo == "Codificador":
-        st.subheader("💻 Modo Codificador")
-        codigo = st.text_area("Descreva o que você quer programar:")
-        if st.button("Gerar Código"):
-            resposta = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "Você é um programador especialista em Python e JavaScript."},
-                    {"role": "user", "content": codigo}
-                ]
-            )
-            st.code(resposta.choices[0].message.content, language="python")
-
-    # =========================================
-    # MODO ESTRATÉGIAS
-    # =========================================
-    elif modo == "Estratégias":
-        st.subheader("🧭 Modo Estratégias")
-        objetivo = st.text_input("Qual é o seu objetivo?")
-        if st.button("Gerar Estratégia"):
-            resposta = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "Você é um consultor estratégico especialista em planejamento e inovação."},
-                    {"role": "user", "content": f"Crie uma estratégia detalhada para alcançar o seguinte objetivo: {objetivo}"}
-                ]
-            )
-            st.markdown(resposta.choices[0].message.content)
+    # ==================================================
+    # OUTROS MODOS (Professor, Designer, Codificador, Estratégias)
+    # ==================================================
+    else:
+        st.subheader(f"🧩 Modo {modo}")
+        user_input = st.text_area("Descreva o que deseja:")
+        if st.button("Gerar Resposta"):
+            try:
+                response = requests.post(
+                    "http://localhost:8000/v1/chat/completions",
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "model": "gpt-oss-120b",
+                        "messages": [
+                            {"role": "system", "content": f"Você está no modo {modo} do PrimeBud."},
+                            {"role": "user", "content": user_input}
+                        ],
+                        "temperature": 0.8
+                    }
+                )
+                data = response.json()
+                st.markdown(data["choices"][0]["message"]["content"])
+            except Exception as e:
+                st.error(f"Erro na conexão com o servidor local: {e}")
 
 else:
     st.warning("Faça login para acessar o PrimeBud.")
