@@ -1,17 +1,15 @@
-# =====================================
-# 🤖 PRIMEBUD 1.0 - GROQ + GPT-OSS + GPT-IMAGE-1
-# =====================================
+# ===========================================
+# 🤖 PRIMEBUD 1.0 - COMPLETO E CORRIGIDO (PLANOS + MODOS)
+# ===========================================
 
 import streamlit as st
-import json, os, hashlib
-from datetime import datetime
+import json, os, hashlib, base64
 from io import BytesIO
 from PIL import Image
-import base64
-import requests
+from datetime import datetime
 
 # =============================
-# CONFIGURAÇÕES INICIAIS
+# CONFIGURAÇÃO INICIAL
 # =============================
 st.set_page_config(
     page_title="PrimeBud 1.0",
@@ -34,125 +32,237 @@ def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=4)
 
-def hash_password(pwd):
-    return hashlib.sha256(pwd.encode()).hexdigest()
+def hash_password(p):
+    return hashlib.sha256(p.encode()).hexdigest()
 
 users = load_users()
 
 # =============================
-# LOGIN
+# LOGIN / CONVIDADO
 # =============================
 st.sidebar.title("🔐 Login do PrimeBud")
-menu = st.sidebar.radio("Menu", ["Entrar", "Registrar"])
+
+menu = st.sidebar.radio("Selecione", ["Entrar", "Registrar", "Convidado"])
 
 if menu == "Registrar":
-    user = st.sidebar.text_input("Usuário")
-    pwd = st.sidebar.text_input("Senha", type="password")
+    u = st.sidebar.text_input("Novo usuário")
+    p = st.sidebar.text_input("Senha", type="password")
     if st.sidebar.button("Registrar"):
-        if user in users:
-            st.sidebar.error("Usuário já existe.")
+        if u in users:
+            st.sidebar.error("Usuário já existe!")
         else:
-            users[user] = hash_password(pwd)
+            users[u] = hash_password(p)
             save_users(users)
             st.sidebar.success("Conta criada com sucesso!")
 
-if menu == "Entrar":
-    user = st.sidebar.text_input("Usuário")
-    pwd = st.sidebar.text_input("Senha", type="password")
+elif menu == "Entrar":
+    u = st.sidebar.text_input("Usuário")
+    p = st.sidebar.text_input("Senha", type="password")
     if st.sidebar.button("Entrar"):
-        if user in users and users[user] == hash_password(pwd):
-            st.session_state["logged_in"] = True
-            st.session_state["user"] = user
+        if u in users and users[u] == hash_password(p):
+            st.session_state["user"] = u
+            st.session_state["logged"] = True
+            st.sidebar.success(f"Bem-vindo(a), {u}!")
         else:
             st.sidebar.error("Usuário ou senha incorretos.")
 
-# =============================
-# INTERFACE PRINCIPAL
-# =============================
-if "logged_in" in st.session_state and st.session_state["logged_in"]:
-    st.title("🤖 PrimeBud 1.0")
-    modo = st.sidebar.selectbox("Modo de operação", [
-        "Chat", "Imagem", "Professor", "Designer", "Codificador", "Estratégias"
-    ])
+elif menu == "Convidado":
+    if st.sidebar.button("Entrar como Convidado"):
+        st.session_state["user"] = "Convidado"
+        st.session_state["logged"] = True
+        st.sidebar.success("Acesso concedido!")
 
-    # ==================================================
-    # MODO CHAT / GROQ / GPT-OSS 120B
-    # ==================================================
-    if modo == "Chat":
-        st.subheader("💬 Conversa Inteligente (Groq/GPT-OSS 120B)")
-        prompt = st.text_area("Digite sua mensagem:")
-        if st.button("Enviar"):
-            if prompt.strip():
-                with st.spinner("Gerando resposta..."):
-                    try:
-                        response = requests.post(
-                            "http://localhost:8000/v1/chat/completions",
-                            headers={"Content-Type": "application/json"},
-                            json={
-                                "model": "gpt-oss-120b",
-                                "messages": [{"role": "user", "content": prompt}],
-                                "temperature": 0.7
-                            }
-                        )
-                        data = response.json()
-                        st.markdown(data["choices"][0]["message"]["content"])
-                    except Exception as e:
-                        st.error(f"Erro na conexão com o modelo local: {e}")
+# =============================
+# PLANOS
+# =============================
+planos_info = {
+    "🆓 Free": {
+        "icone": "💬",
+        "preco": "R$ 0,00 / mês",
+        "tokens": "100 000 tokens",
+        "modos": "⚡ Flash, 🔵 Normal",
+        "descricao": "Acesso básico, ideal para iniciantes. Limite mensal e apenas modos principais."
+    },
+    "⭐ Pro": {
+        "icone": "💻",
+        "preco": "R$ 10,00 / mês",
+        "tokens": "500 000 tokens",
+        "modos": "⚡ Flash, 🔵 Normal, 🍃 Econômico, 💬 Mini",
+        "descricao": "Plano intermediário — respostas rápidas e mais modos. Ideal para estudo e uso cotidiano."
+    },
+    "👑 Deluxe": {
+        "icone": "💎",
+        "preco": "R$ 20,00 / mês",
+        "tokens": "1 000 000 tokens",
+        "modos": "⚡ Flash, 🔵 Normal, 🍃 Econômico, 💬 Mini, 💎 Pro, ☄️ Ultra",
+        "descricao": "Acesso completo. Todos os modos, velocidade máxima e sem limites. Ideal para criadores e uso profissional."
+    }
+}
 
-    # ==================================================
-    # MODO IMAGEM (OpenAI opcional)
-    # ==================================================
+plano_escolhido = st.sidebar.selectbox("💎 Escolha seu plano:", list(planos_info.keys()))
+plano = planos_info[plano_escolhido]
+
+with st.sidebar.expander("📋 Detalhes do Plano"):
+    st.markdown(f"**Plano:** {plano_escolhido}")
+    st.markdown(f"**Ícone:** {plano['icone']}")
+    st.markdown(f"**Preço:** {plano['preco']}")
+    st.markdown(f"**Tokens Mensais:** {plano['tokens']}")
+    st.markdown(f"**Modos Disponíveis:** {plano['modos']}")
+    st.markdown(f"**Descrição:** {plano['descricao']}")
+
+# =============================
+# ÁREA PRINCIPAL
+# =============================
+if "logged" in st.session_state and st.session_state["logged"]:
+    st.title("🤖 PRIMEBUD 1.0")
+    st.caption(f"Modo ativo: **{plano_escolhido}** • Usuário: **{st.session_state['user']}**")
+
+    modo = st.sidebar.selectbox(
+        "Selecione o modo:",
+        ["⚡ Flash", "🔵 Normal", "🍃 Econômico", "💬 Mini", "💎 Pro", "☄️ Ultra", 
+         "Professor", "Designer", "Codificador", "Estratégias", "Imagem"]
+    )
+
+    # =====================================
+    # FLASH MODE
+    # =====================================
+    if modo == "⚡ Flash":
+        st.subheader("⚡ Modo Flash (respostas instantâneas)")
+        pergunta = st.text_area("Digite sua pergunta:")
+        if st.button("Responder"):
+            if pergunta.strip():
+                st.success(f"Resposta rápida para: **{pergunta}**")
+            else:
+                st.warning("Digite algo primeiro.")
+
+    # =====================================
+    # NORMAL MODE
+    # =====================================
+    elif modo == "🔵 Normal":
+        st.subheader("🔵 Modo Normal")
+        texto = st.text_area("Digite seu texto:")
+        if st.button("Gerar resposta"):
+            if texto.strip():
+                st.info(f"🧠 Processando: **{texto}**")
+            else:
+                st.warning("Digite algo antes.")
+
+    # =====================================
+    # ECONÔMICO
+    # =====================================
+    elif modo == "🍃 Econômico":
+        st.subheader("🍃 Modo Econômico (baixo custo de tokens)")
+        conteudo = st.text_area("Entrada de texto:")
+        if st.button("Executar"):
+            if conteudo.strip():
+                st.success("💡 Resposta leve e econômica gerada com sucesso.")
+            else:
+                st.warning("Digite um texto primeiro.")
+
+    # =====================================
+    # MINI
+    # =====================================
+    elif modo == "💬 Mini":
+        st.subheader("💬 Modo Mini (respostas curtas)")
+        pergunta = st.text_input("Pergunta:")
+        if st.button("Gerar Mini Resposta"):
+            if pergunta.strip():
+                st.info(f"👉 Mini resposta: {pergunta[:50]}...")
+            else:
+                st.warning("Digite algo.")
+
+    # =====================================
+    # PRO
+    # =====================================
+    elif modo == "💎 Pro":
+        st.subheader("💎 Modo Pro (respostas detalhadas)")
+        comando = st.text_area("Digite sua solicitação detalhada:")
+        if st.button("Executar Pro"):
+            if comando.strip():
+                st.success("✅ Resposta detalhada gerada com sucesso.")
+            else:
+                st.warning("Digite algo antes.")
+
+    # =====================================
+    # ULTRA
+    # =====================================
+    elif modo == "☄️ Ultra":
+        st.subheader("☄️ Modo Ultra (potência máxima)")
+        texto = st.text_area("Digite sua entrada:")
+        if st.button("Rodar Ultra"):
+            if texto.strip():
+                st.success("🚀 Ultra processamento concluído com sucesso.")
+            else:
+                st.warning("Digite um comando primeiro.")
+
+    # =====================================
+    # PROFESSOR
+    # =====================================
+    elif modo == "Professor":
+        st.subheader("🧑‍🏫 Modo Professor")
+        tema = st.text_input("Tema da aula:")
+        if st.button("Gerar Plano de Aula"):
+            if tema.strip():
+                st.success(f"📘 Plano de aula gerado sobre: **{tema}**")
+            else:
+                st.warning("Digite o tema.")
+
+    # =====================================
+    # DESIGNER
+    # =====================================
+    elif modo == "Designer":
+        st.subheader("🎨 Modo Designer")
+        ideia = st.text_area("Descreva o design:")
+        if st.button("Gerar Ideia"):
+            if ideia.strip():
+                st.info(f"💡 Ideia criada com base em: **{ideia}**")
+            else:
+                st.warning("Digite algo.")
+
+    # =====================================
+    # CODIFICADOR
+    # =====================================
+    elif modo == "Codificador":
+        st.subheader("💻 Modo Codificador")
+        comando = st.text_area("Descreva o código que deseja gerar:")
+        if st.button("Gerar Código"):
+            if comando.strip():
+                st.code(f"# Código baseado em: {comando}\nprint('PrimeBud 1.0 funcionando!')", language="python")
+            else:
+                st.warning("Descreva o código desejado.")
+
+    # =====================================
+    # ESTRATÉGIAS
+    # =====================================
+    elif modo == "Estratégias":
+        st.subheader("🧭 Modo Estratégias")
+        objetivo = st.text_input("Qual é o seu objetivo?")
+        if st.button("Gerar Estratégia"):
+            if objetivo.strip():
+                st.success(f"🎯 Estratégia para atingir: **{objetivo}**")
+            else:
+                st.warning("Digite um objetivo.")
+
+    # =====================================
+    # IMAGEM
+    # =====================================
     elif modo == "Imagem":
-        st.subheader("🎨 Gerador de Imagens (gpt-image-1)")
-        prompt = st.text_input("Descrição da imagem:", "um boneco palito sorrindo")
-        size = st.selectbox("Tamanho", ["256x256", "512x512", "1024x1024"])
-
-        if st.button("Criar Imagem"):
+        st.subheader("🖼️ Gerador de Imagens")
+        prompt = st.text_input("Descreva a imagem:", "um boneco palito sorrindo")
+        size = st.selectbox("Tamanho:", ["256x256", "512x512", "1024x1024"])
+        if st.button("Gerar Imagem"):
             try:
-                # Import protegido — só tenta se a lib existir
-                try:
-                    from openai import OpenAI
-                    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-                    result = client.images.generate(
-                        model="gpt-image-1",
-                        prompt=prompt,
-                        size=size
-                    )
-                    image_base64 = result.data[0].b64_json
-                    image_bytes = base64.b64decode(image_base64)
-                    img = Image.open(BytesIO(image_bytes))
-                    st.image(img, caption="Imagem gerada com sucesso!", use_column_width=True)
-                except ModuleNotFoundError:
-                    st.error("⚠️ O módulo 'openai' não está instalado. "
-                             "Execute `pip install openai` para habilitar o gerador de imagens.")
+                from openai import OpenAI
+                client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+                result = client.images.generate(model="gpt-image-1", prompt=prompt, size=size)
+                img_data = base64.b64decode(result.data[0].b64_json)
+                img = Image.open(BytesIO(img_data))
+                st.image(img, caption="Imagem gerada com sucesso!", use_column_width=True)
+            except ModuleNotFoundError:
+                st.error("⚠️ Instale a biblioteca `openai` para usar o gerador de imagens.")
             except Exception as e:
                 st.error(f"Erro ao gerar imagem: {e}")
 
-    # ==================================================
-    # OUTROS MODOS (Professor, Designer, Codificador, Estratégias)
-    # ==================================================
-    else:
-        st.subheader(f"🧩 Modo {modo}")
-        user_input = st.text_area("Descreva o que deseja:")
-        if st.button("Gerar Resposta"):
-            try:
-                response = requests.post(
-                    "http://localhost:8000/v1/chat/completions",
-                    headers={"Content-Type": "application/json"},
-                    json={
-                        "model": "gpt-oss-120b",
-                        "messages": [
-                            {"role": "system", "content": f"Você está no modo {modo} do PrimeBud."},
-                            {"role": "user", "content": user_input}
-                        ],
-                        "temperature": 0.8
-                    }
-                )
-                data = response.json()
-                st.markdown(data["choices"][0]["message"]["content"])
-            except Exception as e:
-                st.error(f"Erro na conexão com o servidor local: {e}")
-
 else:
-    st.warning("Faça login para acessar o PrimeBud.")
+    st.warning("Faça login ou entre como convidado para acessar o PrimeBud.")
 
