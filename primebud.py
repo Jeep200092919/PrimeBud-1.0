@@ -1,268 +1,231 @@
-# ===========================================
-# 🤖 PRIMEBUD 1.0 - COMPLETO E CORRIGIDO (PLANOS + MODOS)
-# ===========================================
-
 import streamlit as st
-import json, os, hashlib, base64
-from io import BytesIO
-from PIL import Image
-from datetime import datetime
+import requests
+import json
+import os
 
-# =============================
-# CONFIGURAÇÃO INICIAL
-# =============================
+# ============================================================
+# CONFIGURAÇÕES GERAIS
+# ============================================================
 st.set_page_config(
-    page_title="PrimeBud 1.0",
+    page_title="PrimeBud 1.0 — GPT-OSS 120B Ultimate",
     page_icon="🤖",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# =============================
-# SISTEMA DE USUÁRIOS
-# =============================
-USERS_FILE = "users_database.json"
+# ============================================================
+# CHAVES E ENDPOINTS
+# ============================================================
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+GROQ_MODEL = st.secrets.get("GROQ_MODEL", os.getenv("GROQ_MODEL", "gpt-oss-120b"))
 
-def load_users():
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    return {}
+IMAGE_API = "https://api.openai.com/v1/images/generations"
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
 
-def save_users(users):
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f, indent=4)
+GITHUB_URL = "https://github.com/Jeep200092919/PrimeBud-1.0"
 
-def hash_password(p):
-    return hashlib.sha256(p.encode()).hexdigest()
+# ============================================================
+# LOGIN / CONTAS
+# ============================================================
+if "usuarios" not in st.session_state:
+    st.session_state.usuarios = {}
+if "usuario" not in st.session_state:
+    st.session_state.usuario = None
+if "plano" not in st.session_state:
+    st.session_state.plano = None
 
-users = load_users()
+if st.session_state.usuario is None:
+    st.title("PrimeBud 1.0 — GPT-OSS 120B Ultimate")
+    st.link_button("🌐 GitHub", GITHUB_URL)
+    st.divider()
 
-# =============================
-# LOGIN / CONVIDADO
-# =============================
-st.sidebar.title("🔐 Login do PrimeBud")
+    aba = st.tabs(["Entrar", "Criar conta", "Convidado"])
 
-menu = st.sidebar.radio("Selecione", ["Entrar", "Registrar", "Convidado"])
+    with aba[0]:
+        u = st.text_input("Usuário")
+        p = st.text_input("Senha", type="password")
+        if st.button("Entrar"):
+            db = st.session_state.usuarios
+            if u in db and db[u]["senha"] == p:
+                st.session_state.usuario = u
+                st.session_state.plano = db[u]["plano"]
+                st.rerun()
+            else:
+                st.error("Usuário ou senha incorretos.")
 
-if menu == "Registrar":
-    u = st.sidebar.text_input("Novo usuário")
-    p = st.sidebar.text_input("Senha", type="password")
-    if st.sidebar.button("Registrar"):
-        if u in users:
-            st.sidebar.error("Usuário já existe!")
-        else:
-            users[u] = hash_password(p)
-            save_users(users)
-            st.sidebar.success("Conta criada com sucesso!")
+    with aba[1]:
+        novo_u = st.text_input("Novo usuário")
+        nova_s = st.text_input("Nova senha", type="password")
+        plano_i = st.selectbox("Plano", ["Free", "Pro", "Ultra", "Trabalho", "Professor"])
+        if st.button("Criar conta"):
+            db = st.session_state.usuarios
+            if novo_u in db:
+                st.warning("Usuário já existe.")
+            else:
+                db[novo_u] = {"senha": nova_s, "plano": plano_i}
+                st.session_state.usuario = novo_u
+                st.session_state.plano = plano_i
+                st.rerun()
 
-elif menu == "Entrar":
-    u = st.sidebar.text_input("Usuário")
-    p = st.sidebar.text_input("Senha", type="password")
-    if st.sidebar.button("Entrar"):
-        if u in users and users[u] == hash_password(p):
-            st.session_state["user"] = u
-            st.session_state["logged"] = True
-            st.sidebar.success(f"Bem-vindo(a), {u}!")
-        else:
-            st.sidebar.error("Usuário ou senha incorretos.")
+    with aba[2]:
+        if st.button("Entrar como Convidado"):
+            st.session_state.usuario = "Convidado"
+            st.session_state.plano = "Ultra"
+            st.rerun()
 
-elif menu == "Convidado":
-    if st.sidebar.button("Entrar como Convidado"):
-        st.session_state["user"] = "Convidado"
-        st.session_state["logged"] = True
-        st.sidebar.success("Acesso concedido!")
+    st.stop()
 
-# =============================
-# PLANOS
-# =============================
-planos_info = {
-    "🆓 Free": {
-        "icone": "💬",
-        "preco": "R$ 0,00 / mês",
-        "tokens": "100 000 tokens",
-        "modos": "⚡ Flash, 🔵 Normal",
-        "descricao": "Acesso básico, ideal para iniciantes. Limite mensal e apenas modos principais."
-    },
-    "⭐ Pro": {
-        "icone": "💻",
-        "preco": "R$ 10,00 / mês",
-        "tokens": "500 000 tokens",
-        "modos": "⚡ Flash, 🔵 Normal, 🍃 Econômico, 💬 Mini",
-        "descricao": "Plano intermediário — respostas rápidas e mais modos. Ideal para estudo e uso cotidiano."
-    },
-    "👑 Deluxe": {
-        "icone": "💎",
-        "preco": "R$ 20,00 / mês",
-        "tokens": "1 000 000 tokens",
-        "modos": "⚡ Flash, 🔵 Normal, 🍃 Econômico, 💬 Mini, 💎 Pro, ☄️ Ultra",
-        "descricao": "Acesso completo. Todos os modos, velocidade máxima e sem limites. Ideal para criadores e uso profissional."
-    }
+usuario = st.session_state.usuario
+plano = st.session_state.plano
+
+# ============================================================
+# MODOS
+# ============================================================
+MODOS_DESC = {
+    "⚡ Flash": "Respostas curtas e diretas.",
+    "🔵 Normal": "Respostas completas e naturais.",
+    "☄️ Ultra": "Análises longas e complexas.",
+    "💻 Codificador": "Códigos longos e explicados.",
+    "🧠 Explicador": "Explicações detalhadas e didáticas.",
+    "🖼️ Imagem (Beta)": "Cria imagens com base em descrições de texto."
 }
 
-plano_escolhido = st.sidebar.selectbox("💎 Escolha seu plano:", list(planos_info.keys()))
-plano = planos_info[plano_escolhido]
+SYSTEM_PROMPT = (
+    "Você é o PrimeBud, uma IA avançada de raciocínio analítico. "
+    "Responda sempre até o fim do raciocínio, sem cortar o conteúdo. "
+    "Escreva com clareza, lógica e profundidade."
+)
 
-with st.sidebar.expander("📋 Detalhes do Plano"):
-    st.markdown(f"**Plano:** {plano_escolhido}")
-    st.markdown(f"**Ícone:** {plano['icone']}")
-    st.markdown(f"**Preço:** {plano['preco']}")
-    st.markdown(f"**Tokens Mensais:** {plano['tokens']}")
-    st.markdown(f"**Modos Disponíveis:** {plano['modos']}")
-    st.markdown(f"**Descrição:** {plano['descricao']}")
+# ============================================================
+# HISTÓRICO
+# ============================================================
+if "chats" not in st.session_state:
+    st.session_state.chats = [{"nome": "Chat 1", "historico": []}]
+if "chat_atual" not in st.session_state:
+    st.session_state.chat_atual = 0
 
-# =============================
+def novo_chat():
+    n = len(st.session_state.chats) + 1
+    st.session_state.chats.append({"nome": f"Chat {n}", "historico": []})
+    st.session_state.chat_atual = n - 1
+    st.rerun()
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+with st.sidebar:
+    st.title(f"👤 Usuário: {usuario}")
+    st.caption(f"Plano: {plano}")
+    if st.button("➕ Novo Chat"):
+        novo_chat()
+
+    nomes = [c["nome"] for c in st.session_state.chats]
+    idx = st.radio("Chats", list(range(len(nomes))),
+                   index=st.session_state.chat_atual,
+                   format_func=lambda i: nomes[i])
+    st.session_state.chat_atual = idx
+
+    st.divider()
+    modo = st.selectbox("Modo", list(MODOS_DESC.keys()), index=1)
+    st.caption(MODOS_DESC[modo])
+
+# ============================================================
+# FUNÇÕES AUXILIARES
+# ============================================================
+def corrigir_acentos(texto):
+    try:
+        return texto.encode("latin1").decode("utf-8")
+    except Exception:
+        return texto
+
+def gerar_imagem(prompt: str):
+    """Gera imagem via API"""
+    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+    payload = {"model": "gpt-image-1", "prompt": prompt, "size": "1024x1024"}
+    r = requests.post(IMAGE_API, headers=headers, json=payload)
+    if r.status_code != 200:
+        return f"Erro: {r.text}"
+    return r.json()["data"][0]["url"]
+
+def chat_stream(messages, temperature=0.5, max_tokens=16000, timeout=600):
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+    payload = {
+        "model": GROQ_MODEL,
+        "messages": messages,
+        "temperature": temperature,
+        "top_p": 0.9,
+        "stream": True,
+        "max_tokens": max_tokens
+    }
+    with requests.post(GROQ_URL, headers=headers, json=payload, stream=True, timeout=timeout) as r:
+        r.raise_for_status()
+        r.encoding = "utf-8"
+        for line in r.iter_lines(decode_unicode=True):
+            if not line or not line.startswith("data: "):
+                continue
+            data = line[len("data: "):]
+            if data.strip() == "[DONE]":
+                break
+            try:
+                obj = json.loads(data)
+                delta = obj["choices"][0]["delta"].get("content", "")
+                if delta:
+                    yield corrigir_acentos(delta)
+            except Exception:
+                continue
+
+# ============================================================
 # ÁREA PRINCIPAL
-# =============================
-if "logged" in st.session_state and st.session_state["logged"]:
-    st.title("🤖 PRIMEBUD 1.0")
-    st.caption(f"Modo ativo: **{plano_escolhido}** • Usuário: **{st.session_state['user']}**")
+# ============================================================
+chat = st.session_state.chats[st.session_state.chat_atual]
+st.markdown(f"### 💬 Sessão: {chat['nome']}")
 
-    modo = st.sidebar.selectbox(
-        "Selecione o modo:",
-        ["⚡ Flash", "🔵 Normal", "🍃 Econômico", "💬 Mini", "💎 Pro", "☄️ Ultra", 
-         "Professor", "Designer", "Codificador", "Estratégias", "Imagem"]
+for m in chat["historico"]:
+    bg = "#1e1e1e" if m["autor"] == "Você" else "#2a2a2a"
+    st.markdown(
+        f"<div style='background:{bg};color:#eaeaea;padding:10px;border-radius:8px;margin:6px 0;'>"
+        f"<b>{m['autor']}:</b> {m['texto']}</div>",
+        unsafe_allow_html=True
     )
 
-    # =====================================
-    # FLASH MODE
-    # =====================================
-    if modo == "⚡ Flash":
-        st.subheader("⚡ Modo Flash (respostas instantâneas)")
-        pergunta = st.text_area("Digite sua pergunta:")
-        if st.button("Responder"):
-            if pergunta.strip():
-                st.success(f"Resposta rápida para: **{pergunta}**")
-            else:
-                st.warning("Digite algo primeiro.")
+msg = st.chat_input("Digite sua mensagem...")
 
-    # =====================================
-    # NORMAL MODE
-    # =====================================
-    elif modo == "🔵 Normal":
-        st.subheader("🔵 Modo Normal")
-        texto = st.text_area("Digite seu texto:")
-        if st.button("Gerar resposta"):
-            if texto.strip():
-                st.info(f"🧠 Processando: **{texto}**")
-            else:
-                st.warning("Digite algo antes.")
+if msg:
+    chat["historico"].append({"autor": "Você", "texto": msg})
 
-    # =====================================
-    # ECONÔMICO
-    # =====================================
-    elif modo == "🍃 Econômico":
-        st.subheader("🍃 Modo Econômico (baixo custo de tokens)")
-        conteudo = st.text_area("Entrada de texto:")
-        if st.button("Executar"):
-            if conteudo.strip():
-                st.success("💡 Resposta leve e econômica gerada com sucesso.")
+    if modo == "🖼️ Imagem (Beta)":
+        with st.spinner("🎨 Gerando imagem..."):
+            url = gerar_imagem(msg)
+            if "http" in url:
+                st.image(url, caption="Imagem gerada pelo PrimeBud", use_column_width=True)
+                chat["historico"].append({"autor": "PrimeBud", "texto": f"[Imagem gerada: {url}]"})
             else:
-                st.warning("Digite um texto primeiro.")
+                st.error(url)
+    else:
+        with st.spinner("🧠 Raciocinando..."):
+            mensagens = [{"role": "system", "content": SYSTEM_PROMPT}]
+            for h in chat["historico"]:
+                role = "user" if h["autor"] == "Você" else "assistant"
+                mensagens.append({"role": role, "content": h["texto"]})
+            mensagens.append({"role": "user", "content": msg})
 
-    # =====================================
-    # MINI
-    # =====================================
-    elif modo == "💬 Mini":
-        st.subheader("💬 Modo Mini (respostas curtas)")
-        pergunta = st.text_input("Pergunta:")
-        if st.button("Gerar Mini Resposta"):
-            if pergunta.strip():
-                st.info(f"👉 Mini resposta: {pergunta[:50]}...")
-            else:
-                st.warning("Digite algo.")
-
-    # =====================================
-    # PRO
-    # =====================================
-    elif modo == "💎 Pro":
-        st.subheader("💎 Modo Pro (respostas detalhadas)")
-        comando = st.text_area("Digite sua solicitação detalhada:")
-        if st.button("Executar Pro"):
-            if comando.strip():
-                st.success("✅ Resposta detalhada gerada com sucesso.")
-            else:
-                st.warning("Digite algo antes.")
-
-    # =====================================
-    # ULTRA
-    # =====================================
-    elif modo == "☄️ Ultra":
-        st.subheader("☄️ Modo Ultra (potência máxima)")
-        texto = st.text_area("Digite sua entrada:")
-        if st.button("Rodar Ultra"):
-            if texto.strip():
-                st.success("🚀 Ultra processamento concluído com sucesso.")
-            else:
-                st.warning("Digite um comando primeiro.")
-
-    # =====================================
-    # PROFESSOR
-    # =====================================
-    elif modo == "Professor":
-        st.subheader("🧑‍🏫 Modo Professor")
-        tema = st.text_input("Tema da aula:")
-        if st.button("Gerar Plano de Aula"):
-            if tema.strip():
-                st.success(f"📘 Plano de aula gerado sobre: **{tema}**")
-            else:
-                st.warning("Digite o tema.")
-
-    # =====================================
-    # DESIGNER
-    # =====================================
-    elif modo == "Designer":
-        st.subheader("🎨 Modo Designer")
-        ideia = st.text_area("Descreva o design:")
-        if st.button("Gerar Ideia"):
-            if ideia.strip():
-                st.info(f"💡 Ideia criada com base em: **{ideia}**")
-            else:
-                st.warning("Digite algo.")
-
-    # =====================================
-    # CODIFICADOR
-    # =====================================
-    elif modo == "Codificador":
-        st.subheader("💻 Modo Codificador")
-        comando = st.text_area("Descreva o código que deseja gerar:")
-        if st.button("Gerar Código"):
-            if comando.strip():
-                st.code(f"# Código baseado em: {comando}\nprint('PrimeBud 1.0 funcionando!')", language="python")
-            else:
-                st.warning("Descreva o código desejado.")
-
-    # =====================================
-    # ESTRATÉGIAS
-    # =====================================
-    elif modo == "Estratégias":
-        st.subheader("🧭 Modo Estratégias")
-        objetivo = st.text_input("Qual é o seu objetivo?")
-        if st.button("Gerar Estratégia"):
-            if objetivo.strip():
-                st.success(f"🎯 Estratégia para atingir: **{objetivo}**")
-            else:
-                st.warning("Digite um objetivo.")
-
-    # =====================================
-    # IMAGEM
-    # =====================================
-    elif modo == "Imagem":
-        st.subheader("🖼️ Gerador de Imagens")
-        prompt = st.text_input("Descreva a imagem:", "um boneco palito sorrindo")
-        size = st.selectbox("Tamanho:", ["256x256", "512x512", "1024x1024"])
-        if st.button("Gerar Imagem"):
+            resposta_final = ""
             try:
-                from openai import OpenAI
-                client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-                result = client.images.generate(model="gpt-image-1", prompt=prompt, size=size)
-                img_data = base64.b64decode(result.data[0].b64_json)
-                img = Image.open(BytesIO(img_data))
-                st.image(img, caption="Imagem gerada com sucesso!", use_column_width=True)
-            except ModuleNotFoundError:
-                st.error("⚠️ Instale a biblioteca `openai` para usar o gerador de imagens.")
+                for token in chat_stream(mensagens):
+                    resposta_final += token
+                    st.markdown(
+                        f"<div style='background:#2a2a2a;color:#eaeaea;padding:10px;border-radius:8px;'>"
+                        f"<b>PrimeBud:</b><br>{resposta_final}</div>",
+                        unsafe_allow_html=True
+                    )
+                if not resposta_final.strip().endswith(('.', '!', '?')):
+                    resposta_final += "..."
             except Exception as e:
-                st.error(f"Erro ao gerar imagem: {e}")
+                resposta_final = f"[Erro ao completar resposta: {e}]"
 
-else:
-    st.warning("Faça login ou entre como convidado para acessar o PrimeBud.")
+            chat["historico"].append({"autor": "PrimeBud", "texto": resposta_final})
+
+    st.session_state.chats[st.session_state.chat_atual]["historico"] = chat["historico"]
+    st.rerun()
 
