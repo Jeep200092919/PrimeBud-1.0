@@ -120,7 +120,7 @@ usuario = st.session_state.usuario
 plano = st.session_state.plano
 
 # ============================================================
-# MODOS (RENOMEADOS)
+# MODOS (RENOMEADOS + ADICIONADO 1.5)
 # ============================================================
 MODOS_DESC = {
     "Primebud 1.0 Flash": "Respostas curtas e diretas.",
@@ -128,7 +128,8 @@ MODOS_DESC = {
     "Primebud 1.0 leve": "Respostas rápidas e eficientes.",
     "Primebud 1.0 Pro": "Código + explicações claras.",
     "Primebud 1.0 Ultra": "Respostas longas e analíticas.",
-    "Primebud 1.0 Helper": "Perfis: Escola, Professor, Designer, Codificador e Estratégias."
+    "Primebud 1.0 Helper": "Perfis: Escola, Professor, Designer, Codificador e Estratégias.",
+    "Primebud 1.5": "Híbrido entre Ultra e Pro — explica melhor, resume rápido e destaca-se pela clareza."
 }
 
 SYSTEM_PROMPT = (
@@ -179,7 +180,7 @@ with st.sidebar:
     st.session_state.chat_atual = idx
 
     st.divider()
-    modo = st.selectbox("Modo de resposta", list(MODOS_DESC.keys()), index=1)
+    modo = st.selectbox("Modo de resposta", list(MODOS_DESC.keys()), index=6)
     st.caption(MODOS_DESC[modo])
     pensamento_visivel = st.toggle("Mostrar pensamento interno", value=True)
 
@@ -261,4 +262,3 @@ if msg:
 
     chat["historico"].append({"autor": "PrimeBud", "texto": full})
     st.session_state.chats[st.session_state.chat_atual]["historico"] = chat["historico"]
-
