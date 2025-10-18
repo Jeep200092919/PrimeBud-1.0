@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ============================================================
-# CORES DO TEMA (PRETO, BRANCO, LARANJA)
+# CORES E ESTILO
 # ============================================================
 PRIMARY_BG = "#0f0f10"
 PRIMARY_TEXT = "#ffffff"
@@ -26,7 +26,8 @@ st.markdown(f"""
 .stTextInput>div>div>input, textarea {{ color: {PRIMARY_TEXT} !important; background-color: #1a1a1a; border: 1px solid {ACCENT_COLOR}; }}
 .stButton>button {{ color: {PRIMARY_TEXT}; border: 1px solid {ACCENT_COLOR}; background-color: transparent; }}
 .stButton>button:hover {{ background-color: {ACCENT_COLOR}33; }}
-.block-container {{ padding-top: 1rem; }}
+.block-container {{ padding-top: 0.5rem; }}
+.sidebar .stButton>button {{ width: 100%; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -49,13 +50,12 @@ if "plano" not in st.session_state:
     st.session_state.plano = None
 
 if st.session_state.usuario is None:
-    st.title("PrimeBud 1.5 — GPT-OSS 120B")
-    st.link_button("🌐 Repositório GitHub", GITHUB_URL)
+    st.markdown(f"<h1 style='text-align:center;color:{ACCENT_COLOR};'>PrimeBud 1.5 — GPT-OSS 120B</h1>", unsafe_allow_html=True)
+    st.link_button("Repositório GitHub", GITHUB_URL)
     st.divider()
 
     abas = st.tabs(["Entrar", "Criar conta", "Convidado"])
 
-    # --- Entrar ---
     with abas[0]:
         u = st.text_input("Usuário")
         p = st.text_input("Senha", type="password")
@@ -69,7 +69,6 @@ if st.session_state.usuario is None:
             else:
                 st.error("Usuário ou senha incorretos.")
 
-    # --- Criar conta ---
     with abas[1]:
         novo_u = st.text_input("Novo usuário")
         nova_s = st.text_input("Nova senha", type="password")
@@ -85,7 +84,6 @@ if st.session_state.usuario is None:
                 st.success(f"Conta criada: {novo_u} ({plano_i}).")
                 st.rerun()
 
-    # --- Convidado ---
     with abas[2]:
         if st.button("Entrar como Convidado"):
             st.session_state.usuario = "Convidado"
@@ -102,12 +100,12 @@ plano = st.session_state.plano
 # MODOS (RENOMEADOS)
 # ============================================================
 MODOS_DESC = {
-    "⚡ Primebud 1.0 Flash": "Respostas curtas e diretas.",
-    "🔵 Primebud 1.0": "Respostas equilibradas e coerentes.",
-    "🍃 Primebud 1.0 leve": "Respostas rápidas e eficientes.",
-    "💎 Primebud 1.0 Pro": "Código + explicações claras.",
-    "☄️ Primebud 1.0 Ultra": "Respostas longas e analíticas.",
-    "🧩 Primebud 1.0 Helper": "Perfis: Escola, Professor, Designer, Codificador e Estratégias."
+    "Primebud 1.0 Flash": "Respostas curtas e diretas.",
+    "Primebud 1.0": "Respostas equilibradas e coerentes.",
+    "Primebud 1.0 leve": "Respostas rápidas e eficientes.",
+    "Primebud 1.0 Pro": "Código + explicações claras.",
+    "Primebud 1.0 Ultra": "Respostas longas e analíticas.",
+    "Primebud 1.0 Helper": "Perfis: Escola, Professor, Designer, Codificador e Estratégias."
 }
 
 SYSTEM_PROMPT = (
@@ -138,19 +136,18 @@ def novo_chat():
 # SIDEBAR
 # ============================================================
 with st.sidebar:
-    st.title(f"👤 Usuário: {usuario}")
+    st.subheader(f"Usuário: {usuario}")
     st.caption(f"Plano atual: {plano}")
     planos = ["Free", "Pro", "Ultra"]
     novo_plano = st.selectbox("Alterar plano", planos, index=planos.index(plano))
     if st.button("Atualizar plano"):
         st.session_state.plano = novo_plano
         st.session_state.usuarios[usuario]["plano"] = novo_plano
-        st.success("Plano alterado com sucesso.")
+        st.success("Plano alterado.")
         st.rerun()
 
     st.divider()
-    if st.button("➕ Novo Chat"):
-        novo_chat()
+    st.button("Novo Chat", on_click=novo_chat)
 
     nomes = [c["nome"] for c in st.session_state.chats]
     idx = st.radio("Seus chats", list(range(len(nomes))),
@@ -203,13 +200,13 @@ def chat_stream(messages, temperature=0.35, max_tokens=4000, timeout=300):
 # INTERFACE PRINCIPAL
 # ============================================================
 chat = st.session_state.chats[st.session_state.chat_atual]
-st.markdown(f"### 💬 Sessão: {chat['nome']}")
+st.markdown(f"<h3 style='color:{ACCENT_COLOR};'>Sessão: {chat['nome']}</h3>", unsafe_allow_html=True)
 
 for m in chat["historico"]:
     border = f"1px solid {ACCENT_COLOR}" if m["autor"] == "PrimeBud" else "none"
-    bg = "#1a1a1a" if m["autor"] == "Você" else "#222222"
+    bg = "#1a1a1a" if m["autor"] == "Você" else "#1c1c1c"
     st.markdown(
-        f"<div style='background:{bg};border:{border};color:#ffffff;padding:10px;border-radius:8px;margin:6px 0;'>"
+        f"<div style='background:{bg};border:{border};color:{PRIMARY_TEXT};padding:10px;border-radius:8px;margin:6px 0;'>"
         f"<b>{m['autor']}:</b> {m['texto']}</div>",
         unsafe_allow_html=True,
     )
@@ -231,7 +228,7 @@ if msg:
         for token in chat_stream(mensagens):
             full += token
             answer_box.markdown(
-                f"<div style='background:#222222;border:1px solid {ACCENT_COLOR};color:{PRIMARY_TEXT};padding:10px;border-radius:8px;'>"
+                f"<div style='background:#1c1c1c;border:1px solid {ACCENT_COLOR};color:{PRIMARY_TEXT};padding:10px;border-radius:8px;'>"
                 f"<b>PrimeBud 1.5:</b><br>{full}</div>",
                 unsafe_allow_html=True,
             )
@@ -241,3 +238,4 @@ if msg:
 
     chat["historico"].append({"autor": "PrimeBud", "texto": full})
     st.session_state.chats[st.session_state.chat_atual]["historico"] = chat["historico"]
+
