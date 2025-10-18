@@ -1,185 +1,243 @@
-# PrimeBud 1.5 – interface atualizada + modos + Groq exclusivo (GPT OSS 120B)
-# -----------------------------------------------------
-# ✅ Python 3.10–3.12
-# ✅ `pip install streamlit requests python-dotenv`
-# Apenas usa a API do Groq com o modelo GPT OSS 120B
-# Enviar mensagens com Enter
-# -----------------------------------------------------
-
-import os
-import json
-import time
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional
-import requests
 import streamlit as st
+import requests
+import json
+import os
 
-APP_NAME = "PrimeBud 1.5"
-DATA_DIR = Path(".primebud_data")
-USERS_FILE = DATA_DIR / "users_database.json"
-CHATS_DIR = DATA_DIR / "chats"
+# ============================================================
+# CONFIGURAÇÕES GERAIS
+# ============================================================
+st.set_page_config(
+    page_title="PrimeBud 1.5 — GPT-OSS 120B",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Cores: preto básico, texto branco, contornos laranja
-PB_ORANGE = "#ff7a00"
-PB_BG = "#0f0f10"
-PB_TEXT = "#ffffff"
-PB_CARD = "#17181a"
+# ============================================================
+# CORES DO TEMA (PRETO, BRANCO, LARANJA)
+# ============================================================
+PRIMARY_BG = "#0f0f10"
+PRIMARY_TEXT = "#ffffff"
+ACCENT_COLOR = "#ff7a00"
 
-MODES = {
-    "primebud_1_0": {"label": "Primebud 1.0", "desc": "Modo padrão equilibrado."},
-    "flash": {"label": "Primebud 1.0 Flash", "desc": "Respostas rápidas e curtas."},
-    "helper": {"label": "Primebud 1.0 Helper", "desc": "Perfis: Escola, Professor, Designer, Codificador e Estratégias."},
-    "leve": {"label": "Primebud 1.0 leve", "desc": "Versão econômica e objetiva."},
-    "pro": {"label": "Primebud 1.0 Pro", "desc": "Foco em codificação e respostas completas."},
-    "ultra": {"label": "Primebud 1.0 Ultra", "desc": "Respostas detalhadas e estruturadas."},
-    "v15": {"label": "Primebud 1.5", "desc": "Combina Ultra e Pro, com resumos e explicações claras."}
-}
+st.markdown(f"""
+<style>
+.stApp {{ background-color: {PRIMARY_BG}; color: {PRIMARY_TEXT}; }}
+.stTextInput>div>div>input, textarea {{ color: {PRIMARY_TEXT} !important; background-color: #1a1a1a; border: 1px solid {ACCENT_COLOR}; }}
+.stButton>button {{ color: {PRIMARY_TEXT}; border: 1px solid {ACCENT_COLOR}; background-color: transparent; }}
+.stButton>button:hover {{ background-color: {ACCENT_COLOR}33; }}
+.block-container {{ padding-top: 1rem; }}
+</style>
+""", unsafe_allow_html=True)
 
-PLANS = {
-    "free": ["primebud_1_0", "flash", "helper"],
-    "pro": ["primebud_1_0", "flash", "helper", "pro", "leve", "v15"],
-    "ultra": list(MODES.keys())
-}
+# ============================================================
+# CHAVES E ENDPOINTS
+# ============================================================
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+GROQ_MODEL = st.secrets.get("GROQ_MODEL", os.getenv("GROQ_MODEL", "gpt-oss-120b"))
+GITHUB_URL = "https://github.com/Jeep200092919/PrimeBud-1.0"
 
-def ensure_storage():
-    DATA_DIR.mkdir(exist_ok=True)
-    CHATS_DIR.mkdir(exist_ok=True)
-    if not USERS_FILE.exists():
-        USERS_FILE.write_text(json.dumps({"users": {}}, indent=2), encoding="utf-8")
+# ============================================================
+# LOGIN / CONTAS
+# ============================================================
+if "usuarios" not in st.session_state:
+    st.session_state.usuarios = {}
+if "usuario" not in st.session_state:
+    st.session_state.usuario = None
+if "plano" not in st.session_state:
+    st.session_state.plano = None
 
-def load_users():
-    ensure_storage()
-    try:
-        return json.loads(USERS_FILE.read_text())
-    except Exception:
-        return {"users": {}}
+if st.session_state.usuario is None:
+    st.title("PrimeBud 1.5 — GPT-OSS 120B")
+    st.link_button("🌐 Repositório GitHub", GITHUB_URL)
+    st.divider()
 
-def save_users(db: Dict):
-    USERS_FILE.write_text(json.dumps(db, indent=2), encoding="utf-8")
+    abas = st.tabs(["Entrar", "Criar conta", "Convidado"])
 
-def get_user_dir(username: str):
-    d = CHATS_DIR / username
-    d.mkdir(exist_ok=True)
-    return d
+    # --- Entrar ---
+    with abas[0]:
+        u = st.text_input("Usuário")
+        p = st.text_input("Senha", type="password")
+        if st.button("Entrar"):
+            db = st.session_state.usuarios
+            if u in db and db[u]["senha"] == p:
+                st.session_state.usuario = u
+                st.session_state.plano = db[u]["plano"]
+                st.success(f"Bem-vindo, {u}!")
+                st.rerun()
+            else:
+                st.error("Usuário ou senha incorretos.")
 
-def list_chats(username: str):
-    d = get_user_dir(username)
-    return sorted([p.name for p in d.glob("*.json")])
+    # --- Criar conta ---
+    with abas[1]:
+        novo_u = st.text_input("Novo usuário")
+        nova_s = st.text_input("Nova senha", type="password")
+        plano_i = st.selectbox("Plano", ["Free", "Pro", "Ultra"])
+        if st.button("Criar conta"):
+            db = st.session_state.usuarios
+            if novo_u in db:
+                st.warning("Usuário já existe.")
+            else:
+                db[novo_u] = {"senha": nova_s, "plano": plano_i}
+                st.session_state.usuario = novo_u
+                st.session_state.plano = plano_i
+                st.success(f"Conta criada: {novo_u} ({plano_i}).")
+                st.rerun()
 
-def read_chat(username: str, chat_file: str):
-    p = get_user_dir(username) / chat_file
-    if p.exists():
-        try:
-            return json.loads(p.read_text())
-        except Exception:
-            pass
-    return {"messages": []}
-
-def write_chat(username: str, chat_file: str, data: Dict):
-    p = get_user_dir(username) / chat_file
-    p.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-# =========================================================
-# Groq API (GPT OSS 120B)
-# =========================================================
-
-def call_llm(messages: List[Dict]):
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        return "[Erro] Defina GROQ_API_KEY para usar o modelo GPT OSS 120B."
-    try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": "gpt-oss-120b",  # modelo especificado
-                "messages": messages,
-                "temperature": 0.6,
-                "max_tokens": 1500,
-            },
-            timeout=180,
-        )
-        r.raise_for_status()
-        data = r.json()
-        return data["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"[Erro na Groq API] {e}"
-
-# =========================================================
-# Interface visual
-# =========================================================
-
-def inject_css():
-    st.markdown(f"""
-    <style>
-    .stApp {{ background:{PB_BG}; color:{PB_TEXT}; }}
-    .pb-title {{ text-align:center; margin-top:15vh; font-size:28px; color:{PB_TEXT}; }}
-    .stTextArea textarea {{ background:{PB_CARD}; color:{PB_TEXT}; border:1px solid {PB_ORANGE}; border-radius:8px; }}
-    .stChatInput textarea {{ background:{PB_CARD}; color:{PB_TEXT}; border:1px solid {PB_ORANGE}; border-radius:8px; }}
-    .stButton>button {{ border:1px solid {PB_ORANGE}; color:{PB_TEXT}; background:transparent; }}
-    .stButton>button:hover {{ background:{PB_ORANGE}33; }}
-    </style>
-    """, unsafe_allow_html=True)
-
-# =========================================================
-# Login simples (mantido igual)
-# =========================================================
-
-def auth_screen():
-    st.markdown(f"<div class='pb-title'>Bem-vindo ao <span style='color:{PB_ORANGE}'>{APP_NAME}</span></div>", unsafe_allow_html=True)
-    st.write("Login igual ao anterior — apenas o nome e cores foram atualizados.")
-    username = st.text_input("Usuário")
-    password = st.text_input("Senha", type="password")
-    if st.button("Entrar"):
-        db = load_users()
-        u = db["users"].get(username)
-        if u and u.get("password") == password:
-            st.session_state.user = {"username": username, "plan": u.get("plan", "free")}
-            st.success("Login realizado!")
+    # --- Convidado ---
+    with abas[2]:
+        if st.button("Entrar como Convidado"):
+            st.session_state.usuario = "Convidado"
+            st.session_state.plano = "Ultra"
+            st.success("Entrou como convidado (todos os modos liberados).")
             st.rerun()
-        else:
-            st.error("Usuário ou senha inválidos.")
-    if st.button("Entrar como Convidado"):
-        st.session_state.user = {"username": "guest", "plan": "free"}
+
+    st.stop()
+
+usuario = st.session_state.usuario
+plano = st.session_state.plano
+
+# ============================================================
+# MODOS (RENOMEADOS)
+# ============================================================
+MODOS_DESC = {
+    "⚡ Primebud 1.0 Flash": "Respostas curtas e diretas.",
+    "🔵 Primebud 1.0": "Respostas equilibradas e coerentes.",
+    "🍃 Primebud 1.0 leve": "Respostas rápidas e eficientes.",
+    "💎 Primebud 1.0 Pro": "Código + explicações claras.",
+    "☄️ Primebud 1.0 Ultra": "Respostas longas e analíticas.",
+    "🧩 Primebud 1.0 Helper": "Perfis: Escola, Professor, Designer, Codificador e Estratégias."
+}
+
+SYSTEM_PROMPT = (
+    "Você é o PrimeBud 1.5 — uma IA analítica, lógica e objetiva. "
+    "Responda com clareza, raciocínio completo e linguagem profissional."
+)
+
+THINK_PROMPT = (
+    "Descreva seu raciocínio interno em até 5 frases técnicas, "
+    "sem entregar a resposta final. Seja objetivo e preciso."
+)
+
+# ============================================================
+# HISTÓRICO
+# ============================================================
+if "chats" not in st.session_state:
+    st.session_state.chats = [{"nome": "Chat 1", "historico": []}]
+if "chat_atual" not in st.session_state:
+    st.session_state.chat_atual = 0
+
+def novo_chat():
+    n = len(st.session_state.chats) + 1
+    st.session_state.chats.append({"nome": f"Chat {n}", "historico": []})
+    st.session_state.chat_atual = n - 1
+    st.rerun()
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+with st.sidebar:
+    st.title(f"👤 Usuário: {usuario}")
+    st.caption(f"Plano atual: {plano}")
+    planos = ["Free", "Pro", "Ultra"]
+    novo_plano = st.selectbox("Alterar plano", planos, index=planos.index(plano))
+    if st.button("Atualizar plano"):
+        st.session_state.plano = novo_plano
+        st.session_state.usuarios[usuario]["plano"] = novo_plano
+        st.success("Plano alterado com sucesso.")
         st.rerun()
 
-# =========================================================
-# Chat + Groq (Enter para enviar)
-# =========================================================
+    st.divider()
+    if st.button("➕ Novo Chat"):
+        novo_chat()
 
-def chat_ui(user: Dict):
-    inject_css()
+    nomes = [c["nome"] for c in st.session_state.chats]
+    idx = st.radio("Seus chats", list(range(len(nomes))),
+                   index=st.session_state.chat_atual,
+                   format_func=lambda i: nomes[i])
+    st.session_state.chat_atual = idx
 
-    if not st.session_state.get("messages"):
-        st.markdown(f"<div class='pb-title'>What can I help with?</div>", unsafe_allow_html=True)
+    st.divider()
+    modo = st.selectbox("Modo de resposta", list(MODOS_DESC.keys()), index=1)
+    st.caption(MODOS_DESC[modo])
+    pensamento_visivel = st.toggle("Mostrar pensamento interno", value=True)
 
-    for m in st.session_state.get("messages", []):
-        role = "Você" if m["role"] == "user" else "PrimeBud"
-        st.markdown(f"**{role}:** {m['content']}")
+# ============================================================
+# FUNÇÕES GROQ
+# ============================================================
+def corrigir_acentos(texto):
+    try:
+        return texto.encode("latin1").decode("utf-8")
+    except Exception:
+        return texto
 
-    user_input = st.chat_input("Digite e pressione Enter…")
-    if user_input:
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.spinner("Pensando…"):
-            reply = call_llm(st.session_state.messages)
-        st.session_state.messages.append({"role": "assistant", "content": reply})
-        st.rerun()
+def chat_stream(messages, temperature=0.35, max_tokens=4000, timeout=300):
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+    payload = {
+        "model": GROQ_MODEL,
+        "messages": messages,
+        "temperature": temperature,
+        "top_p": 0.9,
+        "stream": True,
+        "max_tokens": max_tokens,
+    }
+    with requests.post(GROQ_URL, headers=headers, json=payload, stream=True, timeout=timeout) as r:
+        r.raise_for_status()
+        r.encoding = "utf-8"
+        for line in r.iter_lines(decode_unicode=True):
+            if not line or not line.startswith("data: "):
+                continue
+            data = line[len("data: ") :]
+            if data.strip() == "[DONE]":
+                break
+            try:
+                obj = json.loads(data)
+                delta = obj["choices"][0]["delta"].get("content", "")
+                if delta:
+                    yield corrigir_acentos(delta)
+            except:
+                continue
 
-# =========================================================
-# Main
-# =========================================================
+# ============================================================
+# INTERFACE PRINCIPAL
+# ============================================================
+chat = st.session_state.chats[st.session_state.chat_atual]
+st.markdown(f"### 💬 Sessão: {chat['nome']}")
 
-def main():
-    st.set_page_config(page_title=APP_NAME, page_icon="🤖", layout="wide")
-    ensure_storage()
-    if "user" not in st.session_state:
-        st.session_state.user = None
-    if not st.session_state.user:
-        auth_screen()
-        return
-    chat_ui(st.session_state.user)
+for m in chat["historico"]:
+    border = f"1px solid {ACCENT_COLOR}" if m["autor"] == "PrimeBud" else "none"
+    bg = "#1a1a1a" if m["autor"] == "Você" else "#222222"
+    st.markdown(
+        f"<div style='background:{bg};border:{border};color:#ffffff;padding:10px;border-radius:8px;margin:6px 0;'>"
+        f"<b>{m['autor']}:</b> {m['texto']}</div>",
+        unsafe_allow_html=True,
+    )
 
-if __name__ == "__main__":
-    main()
+msg = st.chat_input("Digite sua mensagem...")
 
+if msg:
+    chat["historico"].append({"autor": "Você", "texto": msg})
+    st.session_state.chats[st.session_state.chat_atual]["historico"] = chat["historico"]
+
+    answer_box = st.empty()
+    mensagens = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for h in chat["historico"]:
+        role = "user" if h["autor"] == "Você" else "assistant"
+        mensagens.append({"role": role, "content": h["texto"]})
+
+    full = ""
+    try:
+        for token in chat_stream(mensagens):
+            full += token
+            answer_box.markdown(
+                f"<div style='background:#222222;border:1px solid {ACCENT_COLOR};color:{PRIMARY_TEXT};padding:10px;border-radius:8px;'>"
+                f"<b>PrimeBud 1.5:</b><br>{full}</div>",
+                unsafe_allow_html=True,
+            )
+    except Exception as e:
+        full = f"[Erro: {e}]"
+        answer_box.markdown(f"<div>{full}</div>", unsafe_allow_html=True)
+
+    chat["historico"].append({"autor": "PrimeBud", "texto": full})
+    st.session_state.chats[st.session_state.chat_atual]["historico"] = chat["historico"]
