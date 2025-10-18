@@ -22,11 +22,34 @@ ACCENT_COLOR = "#ff7a00"
 
 st.markdown(f"""
 <style>
-.stApp {{ background-color: {PRIMARY_BG}; color: {PRIMARY_TEXT}; }}
-.stTextInput>div>div>input, textarea {{ color: {PRIMARY_TEXT} !important; background-color: #1a1a1a; border: 1px solid {ACCENT_COLOR}; }}
-.stButton>button {{ color: {PRIMARY_TEXT}; border: 1px solid {ACCENT_COLOR}; background-color: transparent; }}
-.stButton>button:hover {{ background-color: {ACCENT_COLOR}33; }}
-.block-container {{ padding-top: 0.5rem; }}
+html, body, .stApp {{
+    background-color: {PRIMARY_BG};
+    color: {PRIMARY_TEXT};
+    overflow-y: auto !important;
+}}
+
+.block-container {{
+    padding-top: 2rem !important;
+    padding-bottom: 3rem !important;
+    margin: 0 auto;
+}}
+
+.stTextInput>div>div>input, textarea {{
+    color: {PRIMARY_TEXT} !important;
+    background-color: #1a1a1a !important;
+    border: 1px solid {ACCENT_COLOR};
+}}
+
+.stButton>button {{
+    color: {PRIMARY_TEXT};
+    border: 1px solid {ACCENT_COLOR};
+    background-color: transparent;
+}}
+
+.stButton>button:hover {{
+    background-color: {ACCENT_COLOR}33;
+}}
+
 .sidebar .stButton>button {{ width: 100%; }}
 </style>
 """, unsafe_allow_html=True)
@@ -50,7 +73,7 @@ if "plano" not in st.session_state:
     st.session_state.plano = None
 
 if st.session_state.usuario is None:
-    st.markdown(f"<h1 style='text-align:center;color:{ACCENT_COLOR};'>PrimeBud 1.5 — GPT-OSS 120B</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align:center;color:{ACCENT_COLOR};margin-bottom:30px;'>PrimeBud 1.5 — GPT-OSS 120B</h1>", unsafe_allow_html=True)
     st.link_button("Repositório GitHub", GITHUB_URL)
     st.divider()
 
@@ -200,7 +223,7 @@ def chat_stream(messages, temperature=0.35, max_tokens=4000, timeout=300):
 # INTERFACE PRINCIPAL
 # ============================================================
 chat = st.session_state.chats[st.session_state.chat_atual]
-st.markdown(f"<h3 style='color:{ACCENT_COLOR};'>Sessão: {chat['nome']}</h3>", unsafe_allow_html=True)
+st.markdown(f"<h3 style='color:{ACCENT_COLOR};margin-top:10px;'>Sessão: {chat['nome']}</h3>", unsafe_allow_html=True)
 
 for m in chat["historico"]:
     border = f"1px solid {ACCENT_COLOR}" if m["autor"] == "PrimeBud" else "none"
