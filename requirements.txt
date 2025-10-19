@@ -1,8 +1,2 @@
-# Edite o requirements.txt e adicione:
-streamlit==1.31.0
-groq==0.4.2
-
-# Depois:
-git add requirements.txt
-git commit -m "Adicionar biblioteca groq"
-git push
+streamlit
+groq
