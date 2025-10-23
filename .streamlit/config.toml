@@ -3,3 +3,8 @@ enableXsrfProtection = false
 enableCORS = false
 headless = true
 port = 8501
+
+[browser]
+gatherUsageStats = false
+serverAddress = "0.0.0.0"
+
