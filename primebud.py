@@ -17,47 +17,54 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Configuração dos Modos (ATUALIZADO PARA LLAMA 3)
+# 2. Configuração dos Modos (MODO 2.0 AJUSTADO)
 MODES_CONFIG = {
     "primebud_1_0_flash": {
         "name": "⚡ PrimeBud 1.0 Flash (Groq)",
         "short_name": "Flash",
-        "description": "Respostas ultrarrápidas (GPT-OSS 120B)", # <-- ATUALIZADO
+        "description": "Respostas ultrarrápidas (Llama 3 70B)", 
         "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
         "temperature": 0.3,
         "max_tokens": 500,
-        "api_provider": "groq", # <-- Define o provedor
-        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
+        "api_provider": "groq", 
+        "model": "llama3-70b-8192" 
     },
     "primebud_1_0": {
         "name": "🔵 PrimeBud 1.0 (Groq)",
         "short_name": "1.0",
-        "description": "Versão clássica balanceada (GPT-OSS 120B)", # <-- ATUALIZADO
+        "description": "Versão clássica balanceada (Llama 3 70B)", 
         "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
         "temperature": 0.7,
         "max_tokens": 2000,
         "api_provider": "groq",
-        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
+        "model": "llama3-70b-8192" 
     },
     "primebud_1_5": {
         "name": "⭐ PrimeBud 1.5 (Groq)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (GPT-OSS 120B)", # <-- ATUALIZADO
+        "description": "Híbrido inteligente (Llama 3 70B)", 
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
         "api_provider": "groq",
-        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
+        "model": "llama3-70b-8192" 
     },
     "primebud_2_0": {
-        "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
+        "name": "🚀 PrimeBud 2.0 (Gemini)", 
         "short_name": "2.0 Gemini",
         "description": "Versão avançada com máxima capacidade (Gemini)",
-        "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
-        "temperature": 0.85,
+        
+        # --- MUDANÇA 1: PROMPT DO SISTEMA ---
+        # Agora ele sabe como responder a um "oi"
+        "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é um assistente prestativo, amigável e avançado. Responda a saudações simples (como 'oi') de forma breve e natural. Para perguntas complexas ou que pedem detalhes, aí sim, forneça análises profundas, respostas detalhadas e completas, explorando múltiplas perspectivas. Adapte sua resposta à consulta do usuário.",
+        
+        # --- MUDANÇA 2: TEMPERATURA ---
+        # Reduzido de 0.85 para 0.6 para diminuir a aleatoriedade
+        "temperature": 0.6, 
+        
         "max_tokens": 4000,
-        "api_provider": "gemini", # <-- MUDOU
-        "model": "gemini-2.5-flash-preview-09-2025" # <-- MUDOU (Conforme solicitado)
+        "api_provider": "gemini", 
+        "model": "gemini-2.5-flash-preview-09-2025"
     },
 }
 
@@ -509,7 +516,7 @@ def delete_chat(chat_id):
 # 6. Funções de Cliente de API (ATUALIZADO)
 
 def get_groq_response(messages, config):
-    """Chama a API Groq (Llama 3).""" # <-- ATUALIZADO
+    """Chama a API Groq (Llama 3).""" 
     try:
         api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
         if not api_key:
@@ -913,6 +920,8 @@ else:
                         save_message(st.session_state.current_chat_id, response_role, response_text)
                     
                     st.rerun()
+
+
 
 
 
