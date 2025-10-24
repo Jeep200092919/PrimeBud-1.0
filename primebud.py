@@ -2,11 +2,14 @@ import streamlit as st
 import sqlite3
 import hashlib
 import re
+import os
+import random
 from datetime import datetime
 from groq import Groq
-import os
+from contextlib import contextmanager
+import google.generativeai as genai # <-- NOVO IMPORT
 
-# Configuração da página
+# 1. Configuração da Página
 st.set_page_config(
     page_title="PrimeBud 2.0",
     page_icon="🤖",
@@ -14,9 +17,55 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS - Tema claro moderno
+# 2. Configuração dos Modos (ATUALIZADO)
+MODES_CONFIG = {
+    "primebud_1_0_flash": {
+        "name": "⚡ PrimeBud 1.0 Flash (Groq)",
+        "short_name": "Flash",
+        "description": "Respostas ultrarrápidas (Llama 3 8B)",
+        "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
+        "temperature": 0.3,
+        "max_tokens": 500,
+        "api_provider": "groq", # <-- Define o provedor
+        "model": "llama3-8b-8192" # Modelo mais rápido para Flash
+    },
+    "primebud_1_0": {
+        "name": "🔵 PrimeBud 1.0 (Groq)",
+        "short_name": "1.0",
+        "description": "Versão clássica balanceada (Llama 3 70B)",
+        "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "api_provider": "groq",
+        "model": "llama3-70b-8192"
+    },
+    "primebud_1_5": {
+        "name": "⭐ PrimeBud 1.5 (Groq)",
+        "short_name": "1.5",
+        "description": "Híbrido inteligente (Llama 3 70B)",
+        "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
+        "temperature": 0.75,
+        "max_tokens": 3000,
+        "api_provider": "groq",
+        "model": "llama3-70b-8192"
+    },
+    "primebud_2_0": {
+        "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
+        "short_name": "2.0 Gemini",
+        "description": "Versão avançada com máxima capacidade (Gemini)",
+        "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
+        "temperature": 0.85,
+        "max_tokens": 4000,
+        "api_provider": "gemini", # <-- MUDOU
+        "model": "gemini-2.5-flash-preview-09-2025" # <-- MUDOU (Conforme solicitado)
+    },
+}
+
+# 3. Estilos CSS
+# (Seu CSS original - omitido por brevidade)
 st.markdown("""
 <style>
+    /* ... Seu CSS completo vai aqui ... */
     /* Tema escuro elegante */
     .main {
         background-color: #1a1d23;
@@ -282,164 +331,32 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Função para detectar e formatar código
+
+# 4. Funções Utilitárias (Helpers)
 def format_message_with_code(content):
-    """Detecta blocos de código e adiciona syntax highlighting"""
-    # Detectar blocos de código com ```
+    """Detecta blocos de código e adiciona syntax highlighting e botão de copiar."""
     code_pattern = r'```(\w+)?\n(.*?)```'
     
     def replace_code(match):
         language = match.group(1) or 'text'
         code = match.group(2)
-        # Escapar HTML
-        code = code.replace('<', '&lt;').replace('>', '&gt;')
+        # Escapar HTML e backticks para o JS
+        code_html_escaped = code.replace('<', '&lt;').replace('>', '&gt;')
+        code_js_escaped = code.replace('`', '\\`').replace('\\', '\\\\')
+        
         return f'''
-        <div style="position: relative;">
-            <pre><code class="language-{language}">{code}</code></pre>
-            <button class="copy-button" onclick="navigator.clipboard.writeText(`{code.replace('`', '\\`')}`)">📋 Copiar Código</button>
+        <div style="position: relative; margin: 1rem 0;">
+            <pre><code class="language-{language}">{code_html_escaped}</code></pre>
+            <button class="copy-button" onclick="navigator.clipboard.writeText(`{code_js_escaped}`)">📋 Copiar Código</button>
         </div>
         '''
     
     formatted = re.sub(code_pattern, replace_code, content, flags=re.DOTALL)
-    
-    # Detectar código inline com `
     inline_pattern = r'`([^`]+)`'
     formatted = re.sub(inline_pattern, r'<code>\1</code>', formatted)
     
     return formatted
 
-# Configuração do banco de dados
-def init_db():
-    conn = sqlite3.connect('primebud.db')
-    c = conn.cursor()
-    
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            plan TEXT DEFAULT 'free',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS chats (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            mode TEXT DEFAULT 'primebud_1_5',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-    
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            chat_id INTEGER NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (chat_id) REFERENCES chats(id)
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-
-# Funções de autenticação
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def create_user(username, password):
-    conn = sqlite3.connect('primebud.db')
-    c = conn.cursor()
-    try:
-        c.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
-                  (username, hash_password(password)))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
-    finally:
-        conn.close()
-
-def verify_user(username, password):
-    conn = sqlite3.connect('primebud.db')
-    c = conn.cursor()
-    c.execute('SELECT id, username, plan FROM users WHERE username = ? AND password_hash = ?',
-              (username, hash_password(password)))
-    user = c.fetchone()
-    conn.close()
-    return user
-
-def create_guest_user():
-    import random
-    guest_id = f"guest_{random.randint(10000, 99999)}"
-    return {
-        'id': guest_id,
-        'username': f'Convidado #{guest_id.split("_")[1]}',
-        'plan': 'free',
-        'is_guest': True
-    }
-
-# Funções de chat
-def create_chat(user_id, name, mode='primebud_1_5'):
-    conn = sqlite3.connect('primebud.db')
-    c = conn.cursor()
-    c.execute('INSERT INTO chats (user_id, name, mode) VALUES (?, ?, ?)',
-              (user_id, name, mode))
-    chat_id = c.lastrowid
-    conn.commit()
-    conn.close()
-    return chat_id
-
-def get_user_chats(user_id):
-    conn = sqlite3.connect('primebud.db')
-    c = conn.cursor()
-    c.execute('SELECT id, name, mode, created_at FROM chats WHERE user_id = ? ORDER BY updated_at DESC',
-              (user_id,))
-    chats = c.fetchall()
-    conn.close()
-    return chats
-
-def get_chat_messages(chat_id):
-    conn = sqlite3.connect('primebud.db')
-    c = conn.cursor()
-    c.execute('SELECT role, content, created_at FROM messages WHERE chat_id = ? ORDER BY created_at',
-              (chat_id,))
-    messages = c.fetchall()
-    conn.close()
-    return messages
-
-def save_message(chat_id, role, content):
-    conn = sqlite3.connect('primebud.db')
-    c = conn.cursor()
-    c.execute('INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)',
-              (chat_id, role, content))
-    c.execute('UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', (chat_id,))
-    conn.commit()
-    conn.close()
-
-def update_chat_mode(chat_id, mode):
-    conn = sqlite3.connect('primebud.db')
-    c = conn.cursor()
-    c.execute('UPDATE chats SET mode = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-              (mode, chat_id))
-    conn.commit()
-    conn.close()
-
-def delete_chat(chat_id):
-    conn = sqlite3.connect('primebud.db')
-    c = conn.cursor()
-    c.execute('DELETE FROM messages WHERE chat_id = ?', (chat_id,))
-    c.execute('DELETE FROM chats WHERE id = ?', (chat_id,))
-    conn.commit()
-    conn.close()
-
-# Função para exportar chat
 def export_chat_to_text(messages, chat_name):
     """Exporta o histórico do chat para texto"""
     text = f"# {chat_name}\n"
@@ -455,75 +372,245 @@ def export_chat_to_text(messages, chat_name):
         if role == "user":
             text += f"👤 VOCÊ:\n{content}\n\n"
         else:
+            # Lidar com 'assistant' (Groq) e 'model' (Gemini)
             text += f"🤖 PRIMEBUD:\n{content}\n\n"
         
         text += "-"*50 + "\n\n"
     
     return text
 
-# Configuração dos 4 modos principais
-MODES_CONFIG = {
-    "primebud_1_0_flash": {
-        "name": "⚡ PrimeBud 1.0 Flash",
-        "short_name": "Flash",
-        "description": "Respostas ultrarrápidas e diretas",
-        "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
-        "temperature": 0.3,
-        "max_tokens": 500,
-    },
-    "primebud_1_0": {
-        "name": "🔵 PrimeBud 1.0",
-        "short_name": "1.0",
-        "description": "Versão clássica balanceada",
-        "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
-        "temperature": 0.7,
-        "max_tokens": 2000,
-    },
-    "primebud_1_5": {
-        "name": "⭐ PrimeBud 1.5",
-        "short_name": "1.5",
-        "description": "Híbrido inteligente (Recomendado)",
-        "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
-        "temperature": 0.75,
-        "max_tokens": 3000,
-    },
-    "primebud_2_0": {
-        "name": "🚀 PrimeBud 2.0",
-        "short_name": "2.0",
-        "description": "Versão avançada com máxima capacidade",
-        "system_prompt": "Você é o PrimeBud 2.0, a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
-        "temperature": 0.85,
-        "max_tokens": 4000,
-    },
-}
+# 5. Funções de Banco de Dados (SQLite)
+DB_NAME = 'primebud.db'
 
-# Função para chamar Groq API
-def get_groq_response(messages, mode="primebud_1_5"):
+@contextmanager
+def get_db_connection():
+    conn = sqlite3.connect(DB_NAME)
+    try:
+        yield conn
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Erro no banco de dados: {e}")
+    finally:
+        conn.close()
+
+def init_db():
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                plan TEXT DEFAULT 'free',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS chats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                mode TEXT DEFAULT 'primebud_1_5',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (chat_id) REFERENCES chats(id)
+            )
+        ''')
+        conn.commit()
+
+# --- Funções de Autenticação (DB) ---
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def create_user(username, password):
+    try:
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            c.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
+                      (username, hash_password(password)))
+            conn.commit()
+        return True, "Conta criada com sucesso!"
+    except sqlite3.IntegrityError:
+        return False, "Nome de usuário já existe."
+    except Exception as e:
+        return False, f"Erro inesperado: {e}"
+
+def verify_user(username, password):
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute('SELECT id, username, plan FROM users WHERE username = ? AND password_hash = ?',
+                  (username, hash_password(password)))
+        return c.fetchone()
+
+# --- Funções de Chat (DB) ---
+def create_chat(user_id, name, mode='primebud_1_5'):
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute('INSERT INTO chats (user_id, name, mode) VALUES (?, ?, ?)',
+                  (user_id, name, mode))
+        chat_id = c.lastrowid
+        conn.commit()
+        return chat_id
+
+def get_user_chats(user_id):
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute('SELECT id, name, mode, created_at FROM chats WHERE user_id = ? ORDER BY updated_at DESC',
+                  (user_id,))
+        return c.fetchall()
+
+def get_chat_messages(chat_id):
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute('SELECT role, content, created_at FROM messages WHERE chat_id = ? ORDER BY created_at',
+                  (chat_id,))
+        return c.fetchall()
+
+def get_chat_info(chat_id):
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute('SELECT name, mode FROM chats WHERE id = ?', (chat_id,))
+        return c.fetchone()
+
+def save_message(chat_id, role, content):
+    # Garante que o role do Gemini ('model') seja salvo como 'assistant'
+    db_role = "assistant" if role == "model" else role
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute('INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)',
+                  (chat_id, db_role, content))
+        c.execute('UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', (chat_id,))
+        conn.commit()
+
+def update_chat_mode(chat_id, mode):
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute('UPDATE chats SET mode = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                  (mode, chat_id))
+        conn.commit()
+
+def delete_chat(chat_id):
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute('DELETE FROM messages WHERE chat_id = ?', (chat_id,))
+        c.execute('DELETE FROM chats WHERE id = ?', (chat_id,))
+        conn.commit()
+
+# 6. Funções de Cliente de API (ATUALIZADO)
+
+def get_groq_response(messages, config):
+    """Chama a API Groq (Llama)."""
     try:
         api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
         if not api_key:
             return "❌ Erro: GROQ_API_KEY não configurada."
         
         client = Groq(api_key=api_key)
-        config = MODES_CONFIG[mode]
         
+        # Groq precisa de 'system' no início
         full_messages = [
             {"role": "system", "content": config["system_prompt"]}
         ] + messages
         
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=config["model"],
             messages=full_messages,
             temperature=config["temperature"],
             max_tokens=config["max_tokens"],
         )
         
-        return response.choices[0].message.content
+        return response.choices[0].message.content, "assistant" # Retorna role
     except Exception as e:
-        return f"❌ Erro ao processar: {str(e)}"
+        st.error(f"Erro ao contatar a API Groq: {e}")
+        return f"❌ Erro ao processar: {str(e)}", "assistant"
 
-# Inicializar
-init_db()
+def get_gemini_response(messages, config):
+    """Chama a API Gemini (NOVA FUNÇÃO)."""
+    try:
+        api_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY")
+        if not api_key:
+            return "❌ Erro: GEMINI_API_KEY não configurada."
+        
+        genai.configure(api_key=api_key)
+        
+        # Formatar mensagens para o Gemini: 'assistant' -> 'model'
+        gemini_messages_formatted = []
+        for msg in messages:
+            role = "model" if msg["role"] == "assistant" else msg["role"]
+            gemini_messages_formatted.append({"role": role, "parts": [{"text": msg["content"]}]})
+        
+        model = genai.GenerativeModel(
+            model_name=config["model"],
+            system_instruction=config["system_prompt"],
+            generation_config=genai.GenerationConfig(
+                temperature=config["temperature"],
+                max_output_tokens=config["max_tokens"]
+            )
+        )
+        
+        # Otimização: remove mensagens consecutivas da mesma role
+        cleaned_messages = []
+        if gemini_messages_formatted:
+            cleaned_messages.append(gemini_messages_formatted[0])
+            for i in range(1, len(gemini_messages_formatted)):
+                if gemini_messages_formatted[i]["role"] != cleaned_messages[-1]["role"]:
+                    cleaned_messages.append(gemini_messages_formatted[i])
+                else:
+                    # Se for a mesma role, concatena o conteúdo (caso raro)
+                    cleaned_messages[-1]["parts"][0]["text"] += "\n" + gemini_messages_formatted[i]["parts"][0]["text"]
+
+
+        response = model.generate_content(cleaned_messages)
+        
+        return response.text, "model" # Retorna role
+    except Exception as e:
+        st.error(f"Erro ao contatar a API Gemini: {e}")
+        # Tenta extrair uma mensagem de erro mais clara da resposta da API
+        try:
+            error_details = str(e)
+            if "API key not valid" in error_details:
+                return "❌ Erro: A chave da API Gemini não é válida. Verifique seus secrets.", "model"
+            if "quota" in error_details:
+                 return "❌ Erro: Você excedeu sua cota na API Gemini.", "model"
+        except:
+            pass
+        return f"❌ Erro ao processar com Gemini: {str(e)}", "model"
+
+
+def generate_chat_response(messages, mode):
+    """Roteador: Chama a API correta com base no modo (NOVA FUNÇÃO)."""
+    config = MODES_CONFIG[mode]
+    provider = config.get("api_provider", "groq") # Padrão é Groq
+    
+    if provider == "gemini":
+        return get_gemini_response(messages, config)
+    else: # 'groq'
+        return get_groq_response(messages, config)
+
+
+# 7. Função de Usuário Convidado
+def create_guest_user():
+    import random
+    guest_id = f"guest_{random.randint(10000, 99999)}"
+    return {
+        'id': guest_id,
+        'username': f'Convidado #{guest_id.split("_")[1]}',
+        'plan': 'free',
+        'is_guest': True
+    }
+
+# 8. Inicialização da Aplicação
+init_db()  # Garante que as tabelas existem
 
 if 'user' not in st.session_state:
     st.session_state.user = None
@@ -534,13 +621,15 @@ if 'guest_chats' not in st.session_state:
 if 'guest_messages' not in st.session_state:
     st.session_state.guest_messages = {}
 
-# Interface de autenticação
+# 9. Lógica Principal da UI
+
+# --- TELA DE AUTENTICAÇÃO ---
 if st.session_state.user is None:
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
         st.markdown("<h1 style='text-align: center;'>🤖 PrimeBud 2.0</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; font-size: 1.1rem; color: #666;'>Assistente de IA de Nova Geração</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 1.1rem; color: #aaa;'>Assistente de IA de Nova Geração</p>", unsafe_allow_html=True)
         st.markdown("---")
         
         tab1, tab2, tab3 = st.tabs(["🔑 Login", "📝 Cadastro", "👤 Convidado"])
@@ -574,14 +663,16 @@ if st.session_state.user is None:
                     st.error("❌ As senhas não coincidem")
                 elif len(signup_password) < 6:
                     st.error("❌ A senha deve ter pelo menos 6 caracteres")
-                elif create_user(signup_username, signup_password):
-                    st.success("✅ Conta criada com sucesso! Faça login para continuar.")
                 else:
-                    st.error("❌ Nome de usuário já existe")
+                    success, message = create_user(signup_username, signup_password)
+                    if success:
+                        st.success(f"✅ {message} Faça login para continuar.")
+                    else:
+                        st.error(f"❌ {message}")
         
         with tab3:
             st.markdown("#### Acesso rápido")
-            st.info("💡 Experimente sem cadastro! Seus chats não serão salvos permanentemente.")
+            st.info("💡 Experimente sem cadastro! Seus chats são temporários.")
             
             if st.button("🎯 Entrar como Convidado", key="guest_btn", use_container_width=True):
                 st.session_state.user = create_guest_user()
@@ -590,15 +681,16 @@ if st.session_state.user is None:
         st.markdown("---")
         st.markdown("""
         <div style='text-align: center; padding: 1rem;'>
-            <p style='color: #666; font-size: 0.9rem;'>
-                <strong>4 Modos Inteligentes</strong> • <strong>Powered by Groq</strong><br>
-                <span style='color: #ff6b35;'>GPT-OSS 120B</span>
+            <p style='color: #aaa; font-size: 0.9rem;'>
+                <strong>Multi-API</strong> • <strong>Powered by Groq & Gemini</strong><br>
+                <span style='color: #ff6b35;'>Llama 3 70B & Gemini 2.5</span>
             </p>
         </div>
         """, unsafe_allow_html=True)
 
+# --- TELA PRINCIPAL (APP) ---
 else:
-    # Interface principal
+    # --- SIDEBAR (Barra Lateral) ---
     with st.sidebar:
         st.markdown("### 🤖 PrimeBud 2.0")
         st.markdown(f"**👤 {st.session_state.user['username']}**")
@@ -626,6 +718,7 @@ else:
         
         if st.session_state.user.get('is_guest'):
             chats = [(k, v['name'], v['mode'], '') for k, v in st.session_state.guest_chats.items()]
+            chats.reverse()
         else:
             chats = get_user_chats(st.session_state.user['id'])
         
@@ -637,14 +730,14 @@ else:
                 col1, col2 = st.columns([5, 1])
                 
                 with col1:
-                    is_current = chat_id == st.session_state.current_chat_id
+                    is_current = (chat_id == st.session_state.current_chat_id)
                     button_label = f"{'📌 ' if is_current else ''}{chat_name}"
                     if st.button(button_label, key=f"chat_{chat_id}", use_container_width=True):
                         st.session_state.current_chat_id = chat_id
                         st.rerun()
                 
                 with col2:
-                    if st.button("🗑️", key=f"del_{chat_id}"):
+                    if st.button("🗑️", key=f"del_{chat_id}", help="Excluir chat"):
                         if st.session_state.user.get('is_guest'):
                             del st.session_state.guest_chats[chat_id]
                             if chat_id in st.session_state.guest_messages:
@@ -661,58 +754,60 @@ else:
             st.session_state.user = None
             st.session_state.current_chat_id = None
             st.rerun()
-    
-    # Área principal
+
+    # --- ÁREA PRINCIPAL ---
     if st.session_state.current_chat_id is None:
+        # Tela de Boas-Vindas (com exemplos)
         st.markdown("<h1 style='text-align: center;'>👋 Bem-vindo ao PrimeBud 2.0</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #666; margin-bottom: 2rem;'>Escolha um modo e comece a conversar</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #aaa; margin-bottom: 2rem;'>Sua assistente Multi-API. Escolha um modo e comece a conversar.</p>", unsafe_allow_html=True)
         
+        st.markdown("### 🚀 Nossos Modos de IA")
         col1, col2 = st.columns(2)
         
         with col1:
-            for mode_key in ["primebud_1_0_flash", "primebud_1_0"]:
+            for mode_key in ["primebud_1_0_flash", "primebud_1_5"]:
                 mode = MODES_CONFIG[mode_key]
                 st.markdown(f"""
-                <div style='background: #2d3139; 
-                            padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; 
-                            border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
+                <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
                     <h3>{mode['name']}</h3>
-                    <p style='color: #666;'>{mode['description']}</p>
+                    <p style='color: #aaa;'>{mode['description']}</p>
                 </div>
                 """, unsafe_allow_html=True)
         
         with col2:
-            for mode_key in ["primebud_1_5", "primebud_2_0"]:
+            for mode_key in ["primebud_1_0", "primebud_2_0"]:
                 mode = MODES_CONFIG[mode_key]
                 st.markdown(f"""
-                <div style='background: #2d3139; 
-                            padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; 
-                            border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
+                <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
                     <h3>{mode['name']}</h3>
-                    <p style='color: #666;'>{mode['description']}</p>
+                    <p style='color: #aaa;'>{mode['description']}</p>
                 </div>
                 """, unsafe_allow_html=True)
         
-        st.info("💡 Crie um novo chat para começar!")
+        st.markdown("---")
+        st.markdown("### 🤔 Experimente perguntar")
+
+        ex_col1, ex_col2, ex_col3 = st.columns(3)
+        with ex_col1:
+            st.info("Me explique o que é computação quântica em termos simples.")
+        with ex_col2:
+            st.info("Escreva um código em Python para um jogo da cobrinha (snake).")
+        with ex_col3:
+            st.info("Quais são os prós e contras de usar React vs. Vue?")
+
+        st.info("💡 **Para começar, clique em '➕ Novo Chat' na barra lateral!**")
     
     else:
-        # Obter informações do chat
+        # --- TELA DE CHAT ATIVO ---
         if st.session_state.user.get('is_guest'):
-            chat_info = (
-                st.session_state.guest_chats[st.session_state.current_chat_id]['name'],
-                st.session_state.guest_chats[st.session_state.current_chat_id]['mode']
-            )
+            chat = st.session_state.guest_chats[st.session_state.current_chat_id]
+            chat_info = (chat['name'], chat['mode'])
         else:
-            conn = sqlite3.connect('primebud.db')
-            c = conn.cursor()
-            c.execute('SELECT name, mode FROM chats WHERE id = ?', (st.session_state.current_chat_id,))
-            chat_info = c.fetchone()
-            conn.close()
+            chat_info = get_chat_info(st.session_state.current_chat_id)
         
         if chat_info:
             chat_name, current_mode = chat_info
             
-            # Cabeçalho
             col1, col2, col3 = st.columns([2, 1, 1])
             
             with col1:
@@ -737,15 +832,18 @@ else:
                         update_chat_mode(st.session_state.current_chat_id, selected_mode)
                     st.rerun()
             
+            # Obter mensagens formatadas para a API
+            messages_for_api = []
+            if st.session_state.user.get('is_guest'):
+                messages_for_api = st.session_state.guest_messages.get(st.session_state.current_chat_id, [])
+            else:
+                db_messages = get_chat_messages(st.session_state.current_chat_id)
+                # Formato para API: [{'role': ..., 'content': ...}]
+                messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
+
             with col3:
-                # Botão de download
-                if st.session_state.user.get('is_guest'):
-                    messages = st.session_state.guest_messages.get(st.session_state.current_chat_id, [])
-                else:
-                    messages = get_chat_messages(st.session_state.current_chat_id)
-                
-                if messages:
-                    chat_text = export_chat_to_text(messages, chat_name)
+                if messages_for_api:
+                    chat_text = export_chat_to_text(messages_for_api, chat_name)
                     st.download_button(
                         label="📥 Exportar",
                         data=chat_text,
@@ -757,28 +855,26 @@ else:
             st.caption(MODES_CONFIG[current_mode]['description'])
             st.markdown("---")
             
-            # Container de mensagens
-            if not messages:
+            # Container de Mensagens
+            if not messages_for_api:
                 st.markdown("""
-                <div style='text-align: center; padding: 3rem; color: #666;'>
+                <div style='text-align: center; padding: 3rem; color: #aaa;'>
                     <h2>🤖</h2>
                     <p style='font-size: 1.1rem;'>Olá! Como posso ajudar você hoje?</p>
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                for msg in messages:
-                    if st.session_state.user.get('is_guest'):
-                        role, content = msg['role'], msg['content']
-                    else:
-                        role, content, _ = msg
+                for msg in messages_for_api:
+                    role, content = msg['role'], msg['content']
                     
                     if role == "user":
                         st.markdown(f'<div class="chat-message user-message"><div class="message-label">Você</div>{content}</div>', unsafe_allow_html=True)
                     else:
+                        # role == 'assistant' ou 'model'
                         formatted_content = format_message_with_code(content)
                         st.markdown(f'<div class="chat-message assistant-message"><div class="message-label">🤖 PrimeBud</div>{formatted_content}</div>', unsafe_allow_html=True)
             
-            # Input
+            # Input de Mensagem
             with st.form(key="message_form", clear_on_submit=True):
                 user_input = st.text_area(
                     "Mensagem",
@@ -790,40 +886,31 @@ else:
                 submitted = st.form_submit_button("📤 Enviar", use_container_width=True)
                 
                 if submitted and user_input.strip():
-                    # Salvar mensagem
+                    # Salva a mensagem do usuário
                     if st.session_state.user.get('is_guest'):
                         if st.session_state.current_chat_id not in st.session_state.guest_messages:
                             st.session_state.guest_messages[st.session_state.current_chat_id] = []
                         st.session_state.guest_messages[st.session_state.current_chat_id].append({
-                            'role': 'user',
-                            'content': user_input
+                            'role': 'user', 'content': user_input
                         })
-                        messages = st.session_state.guest_messages[st.session_state.current_chat_id]
+                        messages_for_api = st.session_state.guest_messages[st.session_state.current_chat_id]
                     else:
                         save_message(st.session_state.current_chat_id, "user", user_input)
-                        messages = get_chat_messages(st.session_state.current_chat_id)
-                    
-                    # Preparar histórico
-                    api_messages = []
-                    for msg in messages:
-                        if st.session_state.user.get('is_guest'):
-                            api_messages.append({"role": msg['role'], "content": msg['content']})
-                        else:
-                            role, content, _ = msg
-                            api_messages.append({"role": role, "content": content})
-                    
-                    # Obter resposta
+                        db_messages = get_chat_messages(st.session_state.current_chat_id)
+                        messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
+
+                    # Chama o roteador de API (ATUALIZADO)
                     with st.spinner("🤔 Processando..."):
-                        response = get_groq_response(api_messages, current_mode)
+                        response_text, response_role = generate_chat_response(messages_for_api, current_mode)
                     
-                    # Salvar resposta
+                    # Salva a resposta (convidado ou usuário)
                     if st.session_state.user.get('is_guest'):
                         st.session_state.guest_messages[st.session_state.current_chat_id].append({
-                            'role': 'assistant',
-                            'content': response
+                            'role': response_role, 'content': response_text
                         })
                     else:
-                        save_message(st.session_state.current_chat_id, "assistant", response)
+                        save_message(st.session_state.current_chat_id, response_role, response_text)
                     
                     st.rerun()
+
 
