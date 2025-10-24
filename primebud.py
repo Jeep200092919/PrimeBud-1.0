@@ -7,7 +7,8 @@ import random
 from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
-import google.generativeai as genai # <-- NOVO IMPORT
+import google.generativeai as genai
+import time # <-- NOVO IMPORT (para a simulação de vídeo)
 
 # 1. Configuração da Página
 st.set_page_config(
@@ -100,7 +101,8 @@ st.markdown("""
         box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.3);
     }
     
-    .stTextArea > div > div > textarea {
+    /* Esta regra foi modificada para não afetar o text_area do vídeo */
+    .stForm .stTextArea > div > div > textarea {
         min-height: 60px !important;
         max-height: 60px !important;
     }
@@ -604,6 +606,35 @@ def generate_chat_response(messages, mode):
     else: # 'groq'
         return get_groq_response(messages, config)
 
+# --- NOVA FUNÇÃO PARA O VEO 3.1 (SIMULAÇÃO) ---
+def get_veo_response(prompt):
+    """Simula uma chamada à API do Veo 3.1."""
+    
+    # TODO: Substitua esta função pela sua lógica real da API Veo 3.1
+    # 1. Obtenha a VEO_API_KEY dos st.secrets
+    #    api_key = os.getenv("VEO_API_KEY") or st.secrets.get("VEO_API_KEY")
+    # 2. Configure o cliente da API Veo
+    #    client = VeoClient(api_key=api_key)
+    # 3. Chame a API para gerar o vídeo
+    #    video_job = client.generate_video(prompt=prompt)
+    # 4. Aguarde o vídeo ser processado
+    #    while video_job.status != 'completed':
+    #        time.sleep(10)
+    #        video_job.update_status()
+    # 5. Retorne a URL do vídeo final
+    #    return video_job.video_url
+
+    # --- Início da Simulação ---
+    with st.spinner(f"🎥 Gerando vídeo para: '{prompt}'... (Simulação: 5 seg)"):
+        time.sleep(5)
+    
+    # URL de um vídeo de exemplo
+    video_url = "[https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4](https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4)"
+    st.success("🎉 Vídeo gerado com sucesso! (Simulação)")
+    # --- Fim da Simulação ---
+    
+    return video_url
+
 
 # 7. Função de Usuário Convidado
 def create_guest_user():
@@ -627,6 +658,9 @@ if 'guest_chats' not in st.session_state:
     st.session_state.guest_chats = {}
 if 'guest_messages' not in st.session_state:
     st.session_state.guest_messages = {}
+# --- NOVO ESTADO PARA O VÍDEO ---
+if 'generated_video_url' not in st.session_state:
+    st.session_state.generated_video_url = None
 
 # 9. Lógica Principal da UI
 
@@ -705,6 +739,8 @@ else:
         st.caption(f"Plano: {st.session_state.user['plan'].upper()}")
         st.markdown("---")
         
+        st.markdown("#### 💬 Chats de Texto") # <-- Título da Seção
+        
         if st.button("➕ Novo Chat", use_container_width=True, key="new_chat"):
             if st.session_state.user.get('is_guest'):
                 import random
@@ -720,9 +756,11 @@ else:
                 chat_name = f"Chat {len(chats) + 1}"
                 chat_id = create_chat(st.session_state.user['id'], chat_name)
                 st.session_state.current_chat_id = chat_id
+            
+            # Limpa o vídeo anterior ao criar novo chat
+            st.session_state.generated_video_url = None
             st.rerun()
         
-        st.markdown("#### 💬 Seus Chats")
         
         if st.session_state.user.get('is_guest'):
             chats = [(k, v['name'], v['mode'], '') for k, v in st.session_state.guest_chats.items()]
@@ -742,6 +780,8 @@ else:
                     button_label = f"{'📌 ' if is_current else ''}{chat_name}"
                     if st.button(button_label, key=f"chat_{chat_id}", use_container_width=True):
                         st.session_state.current_chat_id = chat_id
+                        # Limpa o vídeo anterior ao selecionar chat
+                        st.session_state.generated_video_url = None
                         st.rerun()
                 
                 with col2:
@@ -761,165 +801,202 @@ else:
         if st.button("🚪 Sair", use_container_width=True):
             st.session_state.user = None
             st.session_state.current_chat_id = None
+            st.session_state.generated_video_url = None
             st.rerun()
 
-    # --- ÁREA PRINCIPAL ---
-    if st.session_state.current_chat_id is None:
-        # Tela de Boas-Vindas (com exemplos)
-        st.markdown("<h1 style='text-align: center;'>👋 Bem-vindo ao PrimeBud 2.0</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #aaa; margin-bottom: 2rem;'>Sua assistente Multi-API. Escolha um modo e comece a conversar.</p>", unsafe_allow_html=True)
-        
-        st.markdown("### 🚀 Nossos Modos de IA")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            for mode_key in ["primebud_1_0_flash", "primebud_1_5"]:
-                mode = MODES_CONFIG[mode_key]
-                st.markdown(f"""
-                <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
-                    <h3>{mode['name']}</h3>
-                    <p style='color: #aaa;'>{mode['description']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        with col2:
-            for mode_key in ["primebud_1_0", "primebud_2_0"]:
-                mode = MODES_CONFIG[mode_key]
-                st.markdown(f"""
-                <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
-                    <h3>{mode['name']}</h3>
-                    <p style='color: #aaa;'>{mode['description']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("### 🤔 Experimente perguntar")
-
-        ex_col1, ex_col2, ex_col3 = st.columns(3)
-        with ex_col1:
-            st.info("Me explique o que é computação quântica em termos simples.")
-        with ex_col2:
-            st.info("Escreva um código em Python para um jogo da cobrinha (snake).")
-        with ex_col3:
-            st.info("Quais são os prós e contras de usar React vs. Vue?")
-
-        st.info("💡 **Para começar, clique em '➕ Novo Chat' na barra lateral!**")
+    # --- ÁREA PRINCIPAL COM ABAS (MUDANÇA PRINCIPAL) ---
     
-    else:
-        # --- TELA DE CHAT ATIVO ---
-        if st.session_state.user.get('is_guest'):
-            chat = st.session_state.guest_chats[st.session_state.current_chat_id]
-            chat_info = (chat['name'], chat['mode'])
-        else:
-            chat_info = get_chat_info(st.session_state.current_chat_id)
-        
-        if chat_info:
-            chat_name, current_mode = chat_info
+    main_tab1, main_tab2 = st.tabs(["💬 Chat Principal", "🎬 Gerador de Vídeo (Veo 3.1)"])
+    
+    # --- ABA 1: CHAT (Tudo o que existia antes) ---
+    with main_tab1:
+        if st.session_state.current_chat_id is None:
+            # Tela de Boas-Vindas (com exemplos)
+            st.markdown("<h1 style='text-align: center;'>👋 Bem-vindo ao Chat do PrimeBud</h1>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #aaa; margin-bottom: 2rem;'>Sua assistente Multi-API. Escolha um modo e comece a conversar.</p>", unsafe_allow_html=True)
             
-            col1, col2, col3 = st.columns([2, 1, 1])
+            st.markdown("### 🚀 Nossos Modos de IA")
+            col1, col2 = st.columns(2)
             
             with col1:
-                mode_name = MODES_CONFIG[current_mode]['short_name']
-                st.markdown(f"### 💬 {chat_name} <span class='mode-badge'>{mode_name}</span>", unsafe_allow_html=True)
+                for mode_key in ["primebud_1_0_flash", "primebud_1_5"]:
+                    mode = MODES_CONFIG[mode_key]
+                    st.markdown(f"""
+                    <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
+                        <h3>{mode['name']}</h3>
+                        <p style='color: #aaa;'>{mode['description']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
             
             with col2:
-                mode_options = {k: v["name"] for k, v in MODES_CONFIG.items()}
-                selected_mode = st.selectbox(
-                    "Modo",
-                    options=list(mode_options.keys()),
-                    format_func=lambda x: mode_options[x],
-                    index=list(mode_options.keys()).index(current_mode),
-                    key="mode_selector",
-                    label_visibility="collapsed"
-                )
-                
-                if selected_mode != current_mode:
-                    if st.session_state.user.get('is_guest'):
-                        st.session_state.guest_chats[st.session_state.current_chat_id]['mode'] = selected_mode
-                    else:
-                        update_chat_mode(st.session_state.current_chat_id, selected_mode)
-                    st.rerun()
+                for mode_key in ["primebud_1_0", "primebud_2_0"]:
+                    mode = MODES_CONFIG[mode_key]
+                    st.markdown(f"""
+                    <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
+                        <h3>{mode['name']}</h3>
+                        <p style='color: #aaa;'>{mode['description']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
             
-            # Obter mensagens formatadas para a API
-            messages_for_api = []
-            if st.session_state.user.get('is_guest'):
-                messages_for_api = st.session_state.guest_messages.get(st.session_state.current_chat_id, [])
-            else:
-                db_messages = get_chat_messages(st.session_state.current_chat_id)
-                # Formato para API: [{'role': ..., 'content': ...}]
-                messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
-
-            with col3:
-                if messages_for_api:
-                    chat_text = export_chat_to_text(messages_for_api, chat_name)
-                    st.download_button(
-                        label="📥 Exportar",
-                        data=chat_text,
-                        file_name=f"{chat_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                        mime="text/plain",
-                        use_container_width=True
-                    )
-            
-            st.caption(MODES_CONFIG[current_mode]['description'])
             st.markdown("---")
-            
-            # Container de Mensagens
-            if not messages_for_api:
-                st.markdown("""
-                <div style='text-align: center; padding: 3rem; color: #aaa;'>
-                    <h2>🤖</h2>
-                    <p style='font-size: 1.1rem;'>Olá! Como posso ajudar você hoje?</p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                for msg in messages_for_api:
-                    role, content = msg['role'], msg['content']
-                    
-                    if role == "user":
-                        st.markdown(f'<div class="chat-message user-message"><div class="message-label">Você</div>{content}</div>', unsafe_allow_html=True)
-                    else:
-                        # role == 'assistant' ou 'model'
-                        formatted_content = format_message_with_code(content)
-                        st.markdown(f'<div class="chat-message assistant-message"><div class="message-label">🤖 PrimeBud</div>{formatted_content}</div>', unsafe_allow_html=True)
-            
-            # Input de Mensagem
-            with st.form(key="message_form", clear_on_submit=True):
-                user_input = st.text_area(
-                    "Mensagem",
-                    key="user_input",
-                    placeholder="Digite sua mensagem... (Ctrl+Enter para enviar)",
-                    label_visibility="collapsed"
-                )
-                
-                submitted = st.form_submit_button("📤 Enviar", use_container_width=True)
-                
-                if submitted and user_input.strip():
-                    # Salva a mensagem do usuário
-                    if st.session_state.user.get('is_guest'):
-                        if st.session_state.current_chat_id not in st.session_state.guest_messages:
-                            st.session_state.guest_messages[st.session_state.current_chat_id] = []
-                        st.session_state.guest_messages[st.session_state.current_chat_id].append({
-                            'role': 'user', 'content': user_input
-                        })
-                        messages_for_api = st.session_state.guest_messages[st.session_state.current_chat_id]
-                    else:
-                        save_message(st.session_state.current_chat_id, "user", user_input)
-                        db_messages = get_chat_messages(st.session_state.current_chat_id)
-                        messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
+            st.markdown("### 🤔 Experimente perguntar")
 
-                    # Chama o roteador de API (ATUALIZADO)
-                    with st.spinner("🤔 Processando..."):
-                        response_text, response_role = generate_chat_response(messages_for_api, current_mode)
+            ex_col1, ex_col2, ex_col3 = st.columns(3)
+            with ex_col1:
+                st.info("Me explique o que é computação quântica em termos simples.")
+            with ex_col2:
+                st.info("Escreva um código em Python para um jogo da cobrinha (snake).")
+            with ex_col3:
+                st.info("Quais são os prós e contras de usar React vs. Vue?")
+
+            st.info("💡 **Para começar, clique em '➕ Novo Chat' na barra lateral!**")
+        
+        else:
+            # --- TELA DE CHAT ATIVO ---
+            if st.session_state.user.get('is_guest'):
+                chat = st.session_state.guest_chats[st.session_state.current_chat_id]
+                chat_info = (chat['name'], chat['mode'])
+            else:
+                chat_info = get_chat_info(st.session_state.current_chat_id)
+            
+            if chat_info:
+                chat_name, current_mode = chat_info
+                
+                col1, col2, col3 = st.columns([2, 1, 1])
+                
+                with col1:
+                    mode_name = MODES_CONFIG[current_mode]['short_name']
+                    st.markdown(f"### 💬 {chat_name} <span class='mode-badge'>{mode_name}</span>", unsafe_allow_html=True)
+                
+                with col2:
+                    mode_options = {k: v["name"] for k, v in MODES_CONFIG.items()}
+                    selected_mode = st.selectbox(
+                        "Modo",
+                        options=list(mode_options.keys()),
+                        format_func=lambda x: mode_options[x],
+                        index=list(mode_options.keys()).index(current_mode),
+                        key="mode_selector",
+                        label_visibility="collapsed"
+                    )
                     
-                    # Salva a resposta (convidado ou usuário)
-                    if st.session_state.user.get('is_guest'):
-                        st.session_state.guest_messages[st.session_state.current_chat_id].append({
-                            'role': response_role, 'content': response_text
-                        })
-                    else:
-                        save_message(st.session_state.current_chat_id, response_role, response_text)
+                    if selected_mode != current_mode:
+                        if st.session_state.user.get('is_guest'):
+                            st.session_state.guest_chats[st.session_state.current_chat_id]['mode'] = selected_mode
+                        else:
+                            update_chat_mode(st.session_state.current_chat_id, selected_mode)
+                        st.rerun()
+                
+                # Obter mensagens formatadas para a API
+                messages_for_api = []
+                if st.session_state.user.get('is_guest'):
+                    messages_for_api = st.session_state.guest_messages.get(st.session_state.current_chat_id, [])
+                else:
+                    db_messages = get_chat_messages(st.session_state.current_chat_id)
+                    # Formato para API: [{'role': ..., 'content': ...}]
+                    messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
+
+                with col3:
+                    if messages_for_api:
+                        chat_text = export_chat_to_text(messages_for_api, chat_name)
+                        st.download_button(
+                            label="📥 Exportar",
+                            data=chat_text,
+                            file_name=f"{chat_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                
+                st.caption(MODES_CONFIG[current_mode]['description'])
+                st.markdown("---")
+                
+                # Container de Mensagens
+                if not messages_for_api:
+                    st.markdown("""
+                    <div style='text-align: center; padding: 3rem; color: #aaa;'>
+                        <h2>🤖</h2>
+                        <p style='font-size: 1.1rem;'>Olá! Como posso ajudar você hoje?</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    for msg in messages_for_api:
+                        role, content = msg['role'], msg['content']
+                        
+                        if role == "user":
+                            st.markdown(f'<div class="chat-message user-message"><div class="message-label">Você</div>{content}</div>', unsafe_allow_html=True)
+                        else:
+                            # role == 'assistant' ou 'model'
+                            formatted_content = format_message_with_code(content)
+                            st.markdown(f'<div class="chat-message assistant-message"><div class="message-label">🤖 PrimeBud</div>{formatted_content}</div>', unsafe_allow_html=True)
+                
+                # Input de Mensagem
+                with st.form(key="message_form", clear_on_submit=True):
+                    user_input = st.text_area(
+                        "Mensagem",
+                        key="user_input",
+                        placeholder="Digite sua mensagem... (Ctrl+Enter para enviar)",
+                        label_visibility="collapsed"
+                    )
                     
-                    st.rerun()
+                    submitted = st.form_submit_button("📤 Enviar", use_container_width=True)
+                    
+                    if submitted and user_input.strip():
+                        # Salva a mensagem do usuário
+                        if st.session_state.user.get('is_guest'):
+                            if st.session_state.current_chat_id not in st.session_state.guest_messages:
+                                st.session_state.guest_messages[st.session_state.current_chat_id] = []
+                            st.session_state.guest_messages[st.session_state.current_chat_id].append({
+                                'role': 'user', 'content': user_input
+                            })
+                            messages_for_api = st.session_state.guest_messages[st.session_state.current_chat_id]
+                        else:
+                            save_message(st.session_state.current_chat_id, "user", user_input)
+                            db_messages = get_chat_messages(st.session_state.current_chat_id)
+                            messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
+
+                        # Chama o roteador de API (ATUALIZADO)
+                        with st.spinner("🤔 Processando..."):
+                            response_text, response_role = generate_chat_response(messages_for_api, current_mode)
+                        
+                        # Salva a resposta (convidado ou usuário)
+                        if st.session_state.user.get('is_guest'):
+                            st.session_state.guest_messages[st.session_state.current_chat_id].append({
+                                'role': response_role, 'content': response_text
+                            })
+                        else:
+                            save_message(st.session_state.current_chat_id, response_role, response_text)
+                        
+                        st.rerun()
+
+    # --- ABA 2: GERADOR DE VÍDEO (NOVA SEÇÃO) ---
+    with main_tab2:
+        st.markdown("### 🎬 Gerador de Vídeo (Simulação Veo 3.1)")
+        st.info("Esta é uma interface de simulação para gerar vídeos. Substitua a função `get_veo_response` pela sua lógica de API real.")
+        
+        with st.form("video_form", clear_on_submit=False):
+            video_prompt = st.text_area(
+                "Prompt do Vídeo",
+                placeholder="Ex: Um cachorro golden retriever surfando em uma onda gigante, estilo cinematográfico...",
+                height=150
+            )
+            video_submitted = st.form_submit_button("🚀 Gerar Vídeo")
+
+        if video_submitted and video_prompt:
+            # Limpa o vídeo anterior
+            st.session_state.generated_video_url = None
+            
+            # Chama a função (atualmente, uma simulação)
+            video_url = get_veo_response(video_prompt)
+            
+            # Salva o resultado no estado da sessão
+            st.session_state.generated_video_url = video_url
+        
+        # Exibe o vídeo se ele existir no estado da sessão
+        if st.session_state.generated_video_url:
+            st.markdown("---")
+            st.markdown("#### Resultado do Vídeo:")
+            st.video(st.session_state.generated_video_url)
+
+
 
 
 
