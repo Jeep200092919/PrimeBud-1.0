@@ -8,7 +8,6 @@ from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
 import google.generativeai as genai
-import time # <-- NOVO IMPORT (para a simulação de vídeo)
 
 # 1. Configuração da Página
 st.set_page_config(
@@ -610,32 +609,6 @@ def generate_chat_response(messages, mode):
 def get_veo_response(prompt):
     """Simula uma chamada à API do Veo 3.1."""
 
-    # TODO: Substitua esta função pela sua lógica real da API Veo 3.1
-    # 1. Obtenha a VEO_API_KEY dos st.secrets
-    #    api_key = os.getenv("VEO_API_KEY") or st.secrets.get("VEO_API_KEY")
-    # 2. Configure o cliente da API Veo
-    #    client = VeoClient(api_key=api_key)
-    # 3. Chame a API para gerar o vídeo
-    #    video_job = client.generate_video(prompt=prompt)
-    # 4. Aguarde o vídeo ser processado
-    #    while video_job.status != 'completed':
-    #        time.sleep(10)
-    #        video_job.update_status()
-    # 5. Retorne a URL do vídeo final
-    #    return video_job.video_url
-
-    # --- Início da Simulação ---
-    with st.spinner(f"🎥 Gerando vídeo para: '{prompt}'... (Simulação: 5 seg)"):
-        time.sleep(5)
-
-    # URL de um vídeo de exemplo
-    # --- CORREÇÃO DO ERRO ---
-    # Agora retorna apenas o URL como string
-    video_url = "[https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4](https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4)"
-    st.success("🎉 Vídeo gerado com sucesso! (Simulação)")
-    # --- Fim da Simulação ---
-
-    return video_url
 
 
 # 7. Função de Usuário Convidado
