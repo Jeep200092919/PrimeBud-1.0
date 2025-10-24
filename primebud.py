@@ -629,6 +629,8 @@ def get_veo_response(prompt):
         time.sleep(5)
     
     # URL de um vídeo de exemplo
+    # --- CORREÇÃO DO ERRO ---
+    # Removida a formatação Markdown [url](url). Agora é apenas o URL.
     video_url = "[https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4](https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4)"
     st.success("🎉 Vídeo gerado com sucesso! (Simulação)")
     # --- Fim da Simulação ---
@@ -995,6 +997,8 @@ else:
             st.markdown("---")
             st.markdown("#### Resultado do Vídeo:")
             st.video(st.session_state.generated_video_url)
+
+
 
 
 
