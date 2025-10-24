@@ -1,14 +1,13 @@
 import streamlit as st
 import sqlite3
-import hashlib
+import hashlib  # <-- Revertido para hashlib
 import re
 import os
 import random
 from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
-import google.generativeai as genai
-import bcrypt # <-- Importado para hashing seguro
+import google.generativeai as genai # <-- NOVO IMPORT
 
 # 1. Configuração da Página
 st.set_page_config(
@@ -18,47 +17,47 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Configuração dos Modos
+# 2. Configuração dos Modos (ATUALIZADO PARA LLAMA 3)
 MODES_CONFIG = {
     "primebud_1_0_flash": {
         "name": "⚡ PrimeBud 1.0 Flash (Groq)",
         "short_name": "Flash",
-        "description": "Respostas ultrarrápidas (GPT-OSS 120B)",
+        "description": "Respostas ultrarrápidas (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
         "temperature": 0.3,
         "max_tokens": 500,
-        "api_provider": "groq",
-        "model": "openai/gpt-oss-120b"
+        "api_provider": "groq", # <-- Define o provedor
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_0": {
         "name": "🔵 PrimeBud 1.0 (Groq)",
         "short_name": "1.0",
-        "description": "Versão clássica balanceada (GPT-OSS 120B)",
+        "description": "Versão clássica balanceada (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
         "temperature": 0.7,
         "max_tokens": 2000,
         "api_provider": "groq",
-        "model": "openai/gpt-oss-120b"
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
         "name": "⭐ PrimeBud 1.5 (Groq)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (GPT-OSS 120B)",
+        "description": "Híbrido inteligente (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
         "api_provider": "groq",
-        "model": "openai/gpt-oss-120b"
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_2_0": {
-        "name": "🚀 PrimeBud 2.0 (Gemini)",
+        "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
         "short_name": "2.0 Gemini",
         "description": "Versão avançada com máxima capacidade (Gemini)",
         "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
         "temperature": 0.85,
         "max_tokens": 4000,
-        "api_provider": "gemini",
-        "model": "gemini-2.5-flash-preview-09-2025"
+        "api_provider": "gemini", # <-- MUDOU
+        "model": "gemini-2.5-flash-preview-09-2025" # <-- MUDOU (Conforme solicitado)
     },
 }
 
@@ -73,7 +72,7 @@ st.markdown("""
     }
     
     .block-container {
-        padding-top: 3rem; /* <-- CORREÇÃO APLICADA AQUI */
+        padding-top: 3rem; /* <-- CORREÇÃO DO CSS APLICADA AQUI */
         padding-bottom: 0.5rem;
         max-width: 1200px;
     }
@@ -401,7 +400,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
-                password_hash BLOB NOT NULL,
+                password_hash TEXT NOT NULL,
                 plan TEXT DEFAULT 'free',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -431,12 +430,11 @@ def init_db():
 
 # --- Funções de Autenticação (DB) ---
 def hash_password(password):
-    """Gera um hash seguro da senha usando bcrypt."""
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt)
+    # Revertido para hashlib
+    return hashlib.sha256(password.encode()).hexdigest()
 
 def create_user(username, password):
-    """Cria um novo usuário com senha hasheada."""
+    # Revertido para hashlib
     try:
         with get_db_connection() as conn:
             c = conn.cursor()
@@ -450,20 +448,12 @@ def create_user(username, password):
         return False, f"Erro inesperado: {e}"
 
 def verify_user(username, password):
-    """Verifica o usuário e a senha hasheada."""
+    # Revertido para hashlib
     with get_db_connection() as conn:
         c = conn.cursor()
-        c.execute('SELECT id, username, plan, password_hash FROM users WHERE username = ?', (username,))
-        user_data = c.fetchone()
-        
-        if user_data:
-            user_id, user_username, user_plan, stored_hash = user_data
-            
-            # Compara a senha fornecida com o hash armazenado
-            if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
-                return (user_id, user_username, user_plan) # Retorna (id, username, plan)
-        
-        return None # Retorna None se o usuário não for encontrado ou a senha estiver errada
+        c.execute('SELECT id, username, plan FROM users WHERE username = ? AND password_hash = ?',
+                    (username, hash_password(password)))
+        return c.fetchone()
 
 # --- Funções de Chat (DB) ---
 def create_chat(user_id, name, mode='primebud_1_5'):
@@ -522,7 +512,7 @@ def delete_chat(chat_id):
 # 6. Funções de Cliente de API (ATUALIZADO)
 
 def get_groq_response(messages, config):
-    """Chama a API Groq."""
+    """Chama a API Groq (Llama 3).""" # <-- ATUALIZADO
     try:
         api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
         if not api_key:
@@ -562,18 +552,6 @@ def get_gemini_response(messages, config):
             role = "model" if msg["role"] == "assistant" else msg["role"]
             gemini_messages_formatted.append({"role": role, "parts": [{"text": msg["content"]}]})
         
-        # Limpa o histórico para garantir a alternância de roles
-        cleaned_messages = []
-        if gemini_messages_formatted:
-            cleaned_messages.append(gemini_messages_formatted[0])
-            for i in range(1, len(gemini_messages_formatted)):
-                if gemini_messages_formatted[i]["role"] != cleaned_messages[-1]["role"]:
-                    cleaned_messages.append(gemini_messages_formatted[i])
-                else:
-                    # Substitui a mensagem anterior se for da mesma role (corrige histórico)
-                    cleaned_messages[-1] = gemini_messages_formatted[i]
-
-
         model = genai.GenerativeModel(
             model_name=config["model"],
             system_instruction=config["system_prompt"],
@@ -583,6 +561,18 @@ def get_gemini_response(messages, config):
             )
         )
         
+        # Otimização: remove mensagens consecutivas da mesma role
+        cleaned_messages = []
+        if gemini_messages_formatted:
+            cleaned_messages.append(gemini_messages_formatted[0])
+            for i in range(1, len(gemini_messages_formatted)):
+                if gemini_messages_formatted[i]["role"] != cleaned_messages[-1]["role"]:
+                    cleaned_messages.append(gemini_messages_formatted[i])
+                else:
+                    # Se for a mesma role, concatena o conteúdo (caso raro)
+                    cleaned_messages[-1]["parts"][0]["text"] += "\n" + gemini_messages_formatted[i]["parts"][0]["text"]
+
+
         response = model.generate_content(cleaned_messages)
         
         return response.text, "model" # Retorna role
@@ -601,7 +591,7 @@ def get_gemini_response(messages, config):
 
 
 def generate_chat_response(messages, mode):
-    """Roteador: Chama a API correta com base no modo."""
+    """Roteador: Chama a API correta com base no modo (NOVA FUNÇÃO)."""
     config = MODES_CONFIG[mode]
     provider = config.get("api_provider", "groq") # Padrão é Groq
     
