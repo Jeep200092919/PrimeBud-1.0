@@ -7,7 +7,8 @@ import random
 from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
-import google.generativeai as genai # <-- NOVO IMPORT
+import google.generativeai as genai
+import bcrypt # <-- Importado para hashing seguro
 
 # 1. Configuração da Página
 st.set_page_config(
@@ -17,47 +18,47 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Configuração dos Modos (ATUALIZADO PARA LLAMA 3)
+# 2. Configuração dos Modos
 MODES_CONFIG = {
     "primebud_1_0_flash": {
         "name": "⚡ PrimeBud 1.0 Flash (Groq)",
         "short_name": "Flash",
-        "description": "Respostas ultrarrápidas (GPT-OSS 120B)", # <-- ATUALIZADO
+        "description": "Respostas ultrarrápidas (GPT-OSS 120B)",
         "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
         "temperature": 0.3,
         "max_tokens": 500,
-        "api_provider": "groq", # <-- Define o provedor
-        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
+        "api_provider": "groq",
+        "model": "openai/gpt-oss-120b"
     },
     "primebud_1_0": {
         "name": "🔵 PrimeBud 1.0 (Groq)",
         "short_name": "1.0",
-        "description": "Versão clássica balanceada (GPT-OSS 120B)", # <-- ATUALIZADO
+        "description": "Versão clássica balanceada (GPT-OSS 120B)",
         "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
         "temperature": 0.7,
         "max_tokens": 2000,
         "api_provider": "groq",
-        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
+        "model": "openai/gpt-oss-120b"
     },
     "primebud_1_5": {
         "name": "⭐ PrimeBud 1.5 (Groq)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (GPT-OSS 120B)", # <-- ATUALIZADO
+        "description": "Híbrido inteligente (GPT-OSS 120B)",
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
         "api_provider": "groq",
-        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
+        "model": "openai/gpt-oss-120b"
     },
     "primebud_2_0": {
-        "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
+        "name": "🚀 PrimeBud 2.0 (Gemini)",
         "short_name": "2.0 Gemini",
         "description": "Versão avançada com máxima capacidade (Gemini)",
         "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
         "temperature": 0.85,
         "max_tokens": 4000,
-        "api_provider": "gemini", # <-- MUDOU
-        "model": "gemini-2.5-flash-preview-09-2025" # <-- MUDOU (Conforme solicitado)
+        "api_provider": "gemini",
+        "model": "gemini-2.5-flash-preview-09-2025"
     },
 }
 
@@ -72,7 +73,7 @@ st.markdown("""
     }
     
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 3rem; /* <-- CORREÇÃO APLICADA AQUI */
         padding-bottom: 0.5rem;
         max-width: 1200px;
     }
@@ -400,7 +401,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
+                password_hash BLOB NOT NULL,
                 plan TEXT DEFAULT 'free',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -430,14 +431,17 @@ def init_db():
 
 # --- Funções de Autenticação (DB) ---
 def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Gera um hash seguro da senha usando bcrypt."""
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt)
 
 def create_user(username, password):
+    """Cria um novo usuário com senha hasheada."""
     try:
         with get_db_connection() as conn:
             c = conn.cursor()
             c.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
-                      (username, hash_password(password)))
+                          (username, hash_password(password)))
             conn.commit()
         return True, "Conta criada com sucesso!"
     except sqlite3.IntegrityError:
@@ -446,18 +450,27 @@ def create_user(username, password):
         return False, f"Erro inesperado: {e}"
 
 def verify_user(username, password):
+    """Verifica o usuário e a senha hasheada."""
     with get_db_connection() as conn:
         c = conn.cursor()
-        c.execute('SELECT id, username, plan FROM users WHERE username = ? AND password_hash = ?',
-                  (username, hash_password(password)))
-        return c.fetchone()
+        c.execute('SELECT id, username, plan, password_hash FROM users WHERE username = ?', (username,))
+        user_data = c.fetchone()
+        
+        if user_data:
+            user_id, user_username, user_plan, stored_hash = user_data
+            
+            # Compara a senha fornecida com o hash armazenado
+            if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
+                return (user_id, user_username, user_plan) # Retorna (id, username, plan)
+        
+        return None # Retorna None se o usuário não for encontrado ou a senha estiver errada
 
 # --- Funções de Chat (DB) ---
 def create_chat(user_id, name, mode='primebud_1_5'):
     with get_db_connection() as conn:
         c = conn.cursor()
         c.execute('INSERT INTO chats (user_id, name, mode) VALUES (?, ?, ?)',
-                  (user_id, name, mode))
+                    (user_id, name, mode))
         chat_id = c.lastrowid
         conn.commit()
         return chat_id
@@ -466,14 +479,14 @@ def get_user_chats(user_id):
     with get_db_connection() as conn:
         c = conn.cursor()
         c.execute('SELECT id, name, mode, created_at FROM chats WHERE user_id = ? ORDER BY updated_at DESC',
-                  (user_id,))
+                    (user_id,))
         return c.fetchall()
 
 def get_chat_messages(chat_id):
     with get_db_connection() as conn:
         c = conn.cursor()
         c.execute('SELECT role, content, created_at FROM messages WHERE chat_id = ? ORDER BY created_at',
-                  (chat_id,))
+                    (chat_id,))
         return c.fetchall()
 
 def get_chat_info(chat_id):
@@ -488,7 +501,7 @@ def save_message(chat_id, role, content):
     with get_db_connection() as conn:
         c = conn.cursor()
         c.execute('INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)',
-                  (chat_id, db_role, content))
+                    (chat_id, db_role, content))
         c.execute('UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', (chat_id,))
         conn.commit()
 
@@ -496,7 +509,7 @@ def update_chat_mode(chat_id, mode):
     with get_db_connection() as conn:
         c = conn.cursor()
         c.execute('UPDATE chats SET mode = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                  (mode, chat_id))
+                    (mode, chat_id))
         conn.commit()
 
 def delete_chat(chat_id):
@@ -509,7 +522,7 @@ def delete_chat(chat_id):
 # 6. Funções de Cliente de API (ATUALIZADO)
 
 def get_groq_response(messages, config):
-    """Chama a API Groq (Llama 3).""" # <-- ATUALIZADO
+    """Chama a API Groq."""
     try:
         api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
         if not api_key:
@@ -549,6 +562,18 @@ def get_gemini_response(messages, config):
             role = "model" if msg["role"] == "assistant" else msg["role"]
             gemini_messages_formatted.append({"role": role, "parts": [{"text": msg["content"]}]})
         
+        # Limpa o histórico para garantir a alternância de roles
+        cleaned_messages = []
+        if gemini_messages_formatted:
+            cleaned_messages.append(gemini_messages_formatted[0])
+            for i in range(1, len(gemini_messages_formatted)):
+                if gemini_messages_formatted[i]["role"] != cleaned_messages[-1]["role"]:
+                    cleaned_messages.append(gemini_messages_formatted[i])
+                else:
+                    # Substitui a mensagem anterior se for da mesma role (corrige histórico)
+                    cleaned_messages[-1] = gemini_messages_formatted[i]
+
+
         model = genai.GenerativeModel(
             model_name=config["model"],
             system_instruction=config["system_prompt"],
@@ -558,18 +583,6 @@ def get_gemini_response(messages, config):
             )
         )
         
-        # Otimização: remove mensagens consecutivas da mesma role
-        cleaned_messages = []
-        if gemini_messages_formatted:
-            cleaned_messages.append(gemini_messages_formatted[0])
-            for i in range(1, len(gemini_messages_formatted)):
-                if gemini_messages_formatted[i]["role"] != cleaned_messages[-1]["role"]:
-                    cleaned_messages.append(gemini_messages_formatted[i])
-                else:
-                    # Se for a mesma role, concatena o conteúdo (caso raro)
-                    cleaned_messages[-1]["parts"][0]["text"] += "\n" + gemini_messages_formatted[i]["parts"][0]["text"]
-
-
         response = model.generate_content(cleaned_messages)
         
         return response.text, "model" # Retorna role
@@ -581,14 +594,14 @@ def get_gemini_response(messages, config):
             if "API key not valid" in error_details:
                 return "❌ Erro: A chave da API Gemini não é válida. Verifique seus secrets.", "model"
             if "quota" in error_details:
-                 return "❌ Erro: Você excedeu sua cota na API Gemini.", "model"
+                return "❌ Erro: Você excedeu sua cota na API Gemini.", "model"
         except:
             pass
         return f"❌ Erro ao processar com Gemini: {str(e)}", "model"
 
 
 def generate_chat_response(messages, mode):
-    """Roteador: Chama a API correta com base no modo (NOVA FUNÇÃO)."""
+    """Roteador: Chama a API correta com base no modo."""
     config = MODES_CONFIG[mode]
     provider = config.get("api_provider", "groq") # Padrão é Groq
     
@@ -684,7 +697,7 @@ if st.session_state.user is None:
         <div style='text-align: center; padding: 1rem;'>
             <p style='color: #aaa; font-size: 0.9rem;'>
                 <strong>Multi-API</strong> • <strong>Powered by Groq & Gemini</strong><br>
-                <span style='color: #ff6b35;'>Llama 3 (Groq) & Gemini 2.5</span>
+                <span style='color: #ff6b35;'>GPT-OSS 120B (Groq) & Gemini 2.5</span>
             </p>
         </div>
         """, unsafe_allow_html=True)
