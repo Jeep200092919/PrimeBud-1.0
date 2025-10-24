@@ -7,7 +7,7 @@ import random
 from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
-import google.generativeai as genai
+import google.generativeai as genai # <-- NOVO IMPORT
 
 # 1. Configuração da Página
 st.set_page_config(
@@ -17,54 +17,47 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Configuração dos Modos (MODO 2.0 AJUSTADO)
+# 2. Configuração dos Modos (ATUALIZADO PARA LLAMA 3)
 MODES_CONFIG = {
     "primebud_1_0_flash": {
         "name": "⚡ PrimeBud 1.0 Flash (Groq)",
         "short_name": "Flash",
-        "description": "Respostas ultrarrápidas (Llama 3 70B)",
+        "description": "Respostas ultrarrápidas (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
         "temperature": 0.3,
         "max_tokens": 500,
-        "api_provider": "groq",
-        "model": "llama3-70b-8192"
+        "api_provider": "groq", # <-- Define o provedor
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_0": {
         "name": "🔵 PrimeBud 1.0 (Groq)",
         "short_name": "1.0",
-        "description": "Versão clássica balanceada (Llama 3 70B)",
+        "description": "Versão clássica balanceada (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
         "temperature": 0.7,
         "max_tokens": 2000,
         "api_provider": "groq",
-        "model": "llama3-70b-8192"
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
         "name": "⭐ PrimeBud 1.5 (Groq)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (Llama 3 70B)",
+        "description": "Híbrido inteligente (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
         "api_provider": "groq",
-        "model": "llama3-70b-8192"
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_2_0": {
-        "name": "🚀 PrimeBud 2.0 (Gemini)",
+        "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
         "short_name": "2.0 Gemini",
         "description": "Versão avançada com máxima capacidade (Gemini)",
-
-        # --- MUDANÇA 1: PROMPT DO SISTEMA ---
-        # Agora ele sabe como responder a um "oi"
-        "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é um assistente prestativo, amigável e avançado. Responda a saudações simples (como 'oi') de forma breve e natural. Para perguntas complexas ou que pedem detalhes, aí sim, forneça análises profundas, respostas detalhadas e completas, explorando múltiplas perspectivas. Adapte sua resposta à consulta do usuário.",
-
-        # --- MUDANÇA 2: TEMPERATURA ---
-        # Reduzido de 0.85 para 0.6 para diminuir a aleatoriedade
-        "temperature": 0.6,
-
+        "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
+        "temperature": 0.85,
         "max_tokens": 4000,
-        "api_provider": "gemini",
-        "model": "gemini-2.5-flash-preview-09-2025"
+        "api_provider": "gemini", # <-- MUDOU
+        "model": "gemini-2.5-flash-preview-09-2025" # <-- MUDOU (Conforme solicitado)
     },
 }
 
@@ -77,13 +70,13 @@ st.markdown("""
     .main {
         background-color: #1a1d23;
     }
-
+    
     .block-container {
         padding-top: 1.5rem;
         padding-bottom: 0.5rem;
         max-width: 1200px;
     }
-
+    
     /* Inputs */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
@@ -93,19 +86,18 @@ st.markdown("""
         border-radius: 10px;
         font-size: 0.95rem;
     }
-
+    
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus {
         border-color: #ff6b35;
         box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.3);
     }
-
-    /* Esta regra foi modificada para não afetar o text_area do vídeo */
-    .stForm .stTextArea > div > div > textarea {
+    
+    .stTextArea > div > div > textarea {
         min-height: 60px !important;
         max-height: 60px !important;
     }
-
+    
     .stSelectbox > div > div > select {
         background-color: #2d3139;
         color: #e8e8e8;
@@ -113,7 +105,7 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 600;
     }
-
+    
     /* Mensagens do chat */
     .chat-message {
         padding: 1.2rem;
@@ -125,19 +117,19 @@ st.markdown("""
         animation: fadeIn 0.3s ease-in;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
-
+    
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
-
+    
     .user-message {
         background: linear-gradient(135deg, #ff6b35 0%, #ff8555 100%);
         color: white;
         margin-left: auto;
         margin-right: 0;
     }
-
+    
     .assistant-message {
         background-color: #2d3139;
         color: #e8e8e8;
@@ -145,7 +137,7 @@ st.markdown("""
         margin-right: auto;
         margin-left: 0;
     }
-
+    
     .message-label {
         font-size: 0.7rem;
         opacity: 0.7;
@@ -154,7 +146,7 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-
+    
     /* Botões */
     .stButton > button {
         background: linear-gradient(135deg, #ff6b35 0%, #ff8555 100%);
@@ -167,12 +159,12 @@ st.markdown("""
         transition: all 0.3s ease;
         box-shadow: 0 2px 8px rgba(255, 107, 53, 0.2);
     }
-
+    
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
     }
-
+    
     /* Botão de copiar código */
     .copy-button {
         background: #4CAF50;
@@ -186,12 +178,12 @@ st.markdown("""
         transition: all 0.2s;
         margin-top: 0.5rem;
     }
-
+    
     .copy-button:hover {
         background: #45a049;
         transform: scale(1.05);
     }
-
+    
     /* Títulos */
     h1 {
         color: #ff6b35;
@@ -199,49 +191,49 @@ st.markdown("""
         font-size: 2.5rem;
         margin-bottom: 0.5rem;
     }
-
+    
     h2, h3 {
         color: #ff6b35;
         font-weight: 700;
     }
-
+    
     /* Sidebar */
     [data-testid="stSidebar"] {
         background-color: #1a1d23;
         border-right: 2px solid #2d3139;
     }
-
+    
     [data-testid="stSidebar"] .stButton > button {
         background: #2d3139;
         border: 2px solid #3d4149;
         color: #e8e8e8;
     }
-
+    
     [data-testid="stSidebar"] .stButton > button:hover {
         background: linear-gradient(135deg, #ff6b35 0%, #ff8555 100%);
         border: none;
         color: white;
     }
-
+    
     /* Scrollbar */
     ::-webkit-scrollbar {
         width: 10px;
         height: 10px;
     }
-
+    
     ::-webkit-scrollbar-track {
         background: #1a1d23;
     }
-
+    
     ::-webkit-scrollbar-thumb {
         background: linear-gradient(135deg, #ff6b35 0%, #ff8555 100%);
         border-radius: 5px;
     }
-
+    
     ::-webkit-scrollbar-thumb:hover {
         background: #ff8555;
     }
-
+    
     /* Info boxes */
     .stInfo {
         background-color: #1e3a5f;
@@ -249,19 +241,19 @@ st.markdown("""
         border-radius: 8px;
         color: #e8e8e8;
     }
-
+    
     .stSuccess {
         background-color: #1e4620;
         border-left: 4px solid #4CAF50;
         color: #e8e8e8;
     }
-
+    
     /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 12px;
         background-color: transparent;
     }
-
+    
     .stTabs [data-baseweb="tab"] {
         background-color: #2d3139;
         border-radius: 10px;
@@ -270,13 +262,13 @@ st.markdown("""
         font-weight: 600;
         border: 2px solid #3d4149;
     }
-
+    
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #ff6b35 0%, #ff8555 100%);
         color: white;
         border: none;
     }
-
+    
     /* Badge do modo */
     .mode-badge {
         display: inline-block;
@@ -288,7 +280,7 @@ st.markdown("""
         color: white;
         margin-left: 0.5rem;
     }
-
+    
     /* Container de chat */
     .chat-container {
         background-color: #0f1115;
@@ -297,7 +289,7 @@ st.markdown("""
         margin-bottom: 1rem;
         border: 2px solid #2d3139;
     }
-
+    
     /* Código com syntax highlighting */
     pre {
         background-color: #1e1e1e !important;
@@ -308,7 +300,7 @@ st.markdown("""
         margin: 1rem 0 !important;
         border: 2px solid #333 !important;
     }
-
+    
     code {
         background-color: #1e1e1e !important;
         color: #d4d4d4 !important;
@@ -316,7 +308,7 @@ st.markdown("""
         border-radius: 4px !important;
         font-family: 'Courier New', monospace !important;
     }
-
+    
     /* Download button */
     .download-button {
         background: #2196F3;
@@ -331,7 +323,7 @@ st.markdown("""
         margin-top: 0.5rem;
         display: inline-block;
     }
-
+    
     .download-button:hover {
         background: #1976D2;
         transform: scale(1.05);
@@ -344,25 +336,25 @@ st.markdown("""
 def format_message_with_code(content):
     """Detecta blocos de código e adiciona syntax highlighting e botão de copiar."""
     code_pattern = r'```(\w+)?\n(.*?)```'
-
+    
     def replace_code(match):
         language = match.group(1) or 'text'
         code = match.group(2)
         # Escapar HTML e backticks para o JS
         code_html_escaped = code.replace('<', '&lt;').replace('>', '&gt;')
         code_js_escaped = code.replace('`', '\\`').replace('\\', '\\\\')
-
+        
         return f'''
         <div style="position: relative; margin: 1rem 0;">
             <pre><code class="language-{language}">{code_html_escaped}</code></pre>
             <button class="copy-button" onclick="navigator.clipboard.writeText(`{code_js_escaped}`)">📋 Copiar Código</button>
         </div>
         '''
-
+    
     formatted = re.sub(code_pattern, replace_code, content, flags=re.DOTALL)
     inline_pattern = r'`([^`]+)`'
     formatted = re.sub(inline_pattern, r'<code>\1</code>', formatted)
-
+    
     return formatted
 
 def export_chat_to_text(messages, chat_name):
@@ -370,21 +362,21 @@ def export_chat_to_text(messages, chat_name):
     text = f"# {chat_name}\n"
     text += f"Exportado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
     text += "="*50 + "\n\n"
-
+    
     for msg in messages:
         if isinstance(msg, dict):
             role, content = msg['role'], msg['content']
         else:
             role, content, _ = msg
-
+        
         if role == "user":
             text += f"👤 VOCÊ:\n{content}\n\n"
         else:
             # Lidar com 'assistant' (Groq) e 'model' (Gemini)
             text += f"🤖 PRIMEBUD:\n{content}\n\n"
-
+        
         text += "-"*50 + "\n\n"
-
+    
     return text
 
 # 5. Funções de Banco de Dados (SQLite)
@@ -517,26 +509,26 @@ def delete_chat(chat_id):
 # 6. Funções de Cliente de API (ATUALIZADO)
 
 def get_groq_response(messages, config):
-    """Chama a API Groq (Llama 3)."""
+    """Chama a API Groq (Llama 3).""" # <-- ATUALIZADO
     try:
         api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
         if not api_key:
             return "❌ Erro: GROQ_API_KEY não configurada."
-
+        
         client = Groq(api_key=api_key)
-
+        
         # Groq precisa de 'system' no início
         full_messages = [
             {"role": "system", "content": config["system_prompt"]}
         ] + messages
-
+        
         response = client.chat.completions.create(
             model=config["model"],
             messages=full_messages,
             temperature=config["temperature"],
             max_tokens=config["max_tokens"],
         )
-
+        
         return response.choices[0].message.content, "assistant" # Retorna role
     except Exception as e:
         st.error(f"Erro ao contatar a API Groq: {e}")
@@ -548,15 +540,15 @@ def get_gemini_response(messages, config):
         api_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY")
         if not api_key:
             return "❌ Erro: GEMINI_API_KEY não configurada."
-
+        
         genai.configure(api_key=api_key)
-
+        
         # Formatar mensagens para o Gemini: 'assistant' -> 'model'
         gemini_messages_formatted = []
         for msg in messages:
             role = "model" if msg["role"] == "assistant" else msg["role"]
             gemini_messages_formatted.append({"role": role, "parts": [{"text": msg["content"]}]})
-
+        
         model = genai.GenerativeModel(
             model_name=config["model"],
             system_instruction=config["system_prompt"],
@@ -565,7 +557,7 @@ def get_gemini_response(messages, config):
                 max_output_tokens=config["max_tokens"]
             )
         )
-
+        
         # Otimização: remove mensagens consecutivas da mesma role
         cleaned_messages = []
         if gemini_messages_formatted:
@@ -579,7 +571,7 @@ def get_gemini_response(messages, config):
 
 
         response = model.generate_content(cleaned_messages)
-
+        
         return response.text, "model" # Retorna role
     except Exception as e:
         st.error(f"Erro ao contatar a API Gemini: {e}")
@@ -599,16 +591,11 @@ def generate_chat_response(messages, mode):
     """Roteador: Chama a API correta com base no modo (NOVA FUNÇÃO)."""
     config = MODES_CONFIG[mode]
     provider = config.get("api_provider", "groq") # Padrão é Groq
-
+    
     if provider == "gemini":
         return get_gemini_response(messages, config)
     else: # 'groq'
         return get_groq_response(messages, config)
-
-# --- NOVA FUNÇÃO PARA O VEO 3.1 (SIMULAÇÃO) ---
-def get_veo_response(prompt):
-    """Simula uma chamada à API do Veo 3.1."""
-
 
 
 # 7. Função de Usuário Convidado
@@ -633,28 +620,25 @@ if 'guest_chats' not in st.session_state:
     st.session_state.guest_chats = {}
 if 'guest_messages' not in st.session_state:
     st.session_state.guest_messages = {}
-# --- NOVO ESTADO PARA O VÍDEO ---
-if 'generated_video_url' not in st.session_state:
-    st.session_state.generated_video_url = None
 
 # 9. Lógica Principal da UI
 
 # --- TELA DE AUTENTICAÇÃO ---
 if st.session_state.user is None:
     col1, col2, col3 = st.columns([1, 2, 1])
-
+    
     with col2:
         st.markdown("<h1 style='text-align: center;'>🤖 PrimeBud 2.0</h1>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; font-size: 1.1rem; color: #aaa;'>Assistente de IA de Nova Geração</p>", unsafe_allow_html=True)
         st.markdown("---")
-
+        
         tab1, tab2, tab3 = st.tabs(["🔑 Login", "📝 Cadastro", "👤 Convidado"])
-
+        
         with tab1:
             st.markdown("#### Entre com sua conta")
             login_username = st.text_input("Usuário", key="login_user", placeholder="Digite seu usuário")
             login_password = st.text_input("Senha", type="password", key="login_pass", placeholder="Digite sua senha")
-
+            
             if st.button("🚀 Entrar", key="login_btn", use_container_width=True):
                 user = verify_user(login_username, login_password)
                 if user:
@@ -667,13 +651,13 @@ if st.session_state.user is None:
                     st.rerun()
                 else:
                     st.error("❌ Usuário ou senha incorretos")
-
+        
         with tab2:
             st.markdown("#### Criar nova conta")
             signup_username = st.text_input("Usuário", key="signup_user", placeholder="Escolha um usuário")
             signup_password = st.text_input("Senha", type="password", key="signup_pass", placeholder="Mínimo 6 caracteres")
             signup_password_confirm = st.text_input("Confirmar Senha", type="password", key="signup_pass_confirm", placeholder="Digite novamente")
-
+            
             if st.button("✨ Criar Conta", key="signup_btn", use_container_width=True):
                 if signup_password != signup_password_confirm:
                     st.error("❌ As senhas não coincidem")
@@ -685,15 +669,15 @@ if st.session_state.user is None:
                         st.success(f"✅ {message} Faça login para continuar.")
                     else:
                         st.error(f"❌ {message}")
-
+        
         with tab3:
             st.markdown("#### Acesso rápido")
             st.info("💡 Experimente sem cadastro! Seus chats são temporários.")
-
+            
             if st.button("🎯 Entrar como Convidado", key="guest_btn", use_container_width=True):
                 st.session_state.user = create_guest_user()
                 st.rerun()
-
+        
         st.markdown("---")
         # ATUALIZADO para refletir os modelos corretos
         st.markdown("""
@@ -713,9 +697,7 @@ else:
         st.markdown(f"**👤 {st.session_state.user['username']}**")
         st.caption(f"Plano: {st.session_state.user['plan'].upper()}")
         st.markdown("---")
-
-        st.markdown("#### 💬 Chats de Texto") # <-- Título da Seção
-
+        
         if st.button("➕ Novo Chat", use_container_width=True, key="new_chat"):
             if st.session_state.user.get('is_guest'):
                 import random
@@ -731,34 +713,30 @@ else:
                 chat_name = f"Chat {len(chats) + 1}"
                 chat_id = create_chat(st.session_state.user['id'], chat_name)
                 st.session_state.current_chat_id = chat_id
-
-            # Limpa o vídeo anterior ao criar novo chat
-            st.session_state.generated_video_url = None
             st.rerun()
-
-
+        
+        st.markdown("#### 💬 Seus Chats")
+        
         if st.session_state.user.get('is_guest'):
             chats = [(k, v['name'], v['mode'], '') for k, v in st.session_state.guest_chats.items()]
             chats.reverse()
         else:
             chats = get_user_chats(st.session_state.user['id'])
-
+        
         if not chats:
             st.caption("Nenhum chat ainda")
         else:
             for chat in chats:
                 chat_id, chat_name, chat_mode, _ = chat
                 col1, col2 = st.columns([5, 1])
-
+                
                 with col1:
                     is_current = (chat_id == st.session_state.current_chat_id)
                     button_label = f"{'📌 ' if is_current else ''}{chat_name}"
                     if st.button(button_label, key=f"chat_{chat_id}", use_container_width=True):
                         st.session_state.current_chat_id = chat_id
-                        # Limpa o vídeo anterior ao selecionar chat
-                        st.session_state.generated_video_url = None
                         st.rerun()
-
+                
                 with col2:
                     if st.button("🗑️", key=f"del_{chat_id}", help="Excluir chat"):
                         if st.session_state.user.get('is_guest'):
@@ -767,207 +745,173 @@ else:
                                 del st.session_state.guest_messages[chat_id]
                         else:
                             delete_chat(chat_id)
-
+                        
                         if st.session_state.current_chat_id == chat_id:
                             st.session_state.current_chat_id = None
                         st.rerun()
-
+        
         st.markdown("---")
         if st.button("🚪 Sair", use_container_width=True):
             st.session_state.user = None
             st.session_state.current_chat_id = None
-            st.session_state.generated_video_url = None
             st.rerun()
 
-    # --- ÁREA PRINCIPAL COM ABAS (MUDANÇA PRINCIPAL) ---
+    # --- ÁREA PRINCIPAL ---
+    if st.session_state.current_chat_id is None:
+        # Tela de Boas-Vindas (com exemplos)
+        st.markdown("<h1 style='text-align: center;'>👋 Bem-vindo ao PrimeBud 2.0</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #aaa; margin-bottom: 2rem;'>Sua assistente Multi-API. Escolha um modo e comece a conversar.</p>", unsafe_allow_html=True)
+        
+        st.markdown("### 🚀 Nossos Modos de IA")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            for mode_key in ["primebud_1_0_flash", "primebud_1_5"]:
+                mode = MODES_CONFIG[mode_key]
+                st.markdown(f"""
+                <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
+                    <h3>{mode['name']}</h3>
+                    <p style='color: #aaa;'>{mode['description']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with col2:
+            for mode_key in ["primebud_1_0", "primebud_2_0"]:
+                mode = MODES_CONFIG[mode_key]
+                st.markdown(f"""
+                <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
+                    <h3>{mode['name']}</h3>
+                    <p style='color: #aaa;'>{mode['description']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("### 🤔 Experimente perguntar")
 
-    main_tab1, main_tab2 = st.tabs(["💬 Chat Principal", "🎬 Gerador de Vídeo (Veo 3.1)"])
+        ex_col1, ex_col2, ex_col3 = st.columns(3)
+        with ex_col1:
+            st.info("Me explique o que é computação quântica em termos simples.")
+        with ex_col2:
+            st.info("Escreva um código em Python para um jogo da cobrinha (snake).")
+        with ex_col3:
+            st.info("Quais são os prós e contras de usar React vs. Vue?")
 
-    # --- ABA 1: CHAT (Tudo o que existia antes) ---
-    with main_tab1:
-        if st.session_state.current_chat_id is None:
-            # Tela de Boas-Vindas (com exemplos)
-            st.markdown("<h1 style='text-align: center;'>👋 Bem-vindo ao Chat do PrimeBud</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #aaa; margin-bottom: 2rem;'>Sua assistente Multi-API. Escolha um modo e comece a conversar.</p>", unsafe_allow_html=True)
-
-            st.markdown("### 🚀 Nossos Modos de IA")
-            col1, col2 = st.columns(2)
-
-            with col1:
-                for mode_key in ["primebud_1_0_flash", "primebud_1_5"]:
-                    mode = MODES_CONFIG[mode_key]
-                    st.markdown(f"""
-                    <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
-                        <h3>{mode['name']}</h3>
-                        <p style='color: #aaa;'>{mode['description']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            with col2:
-                for mode_key in ["primebud_1_0", "primebud_2_0"]:
-                    mode = MODES_CONFIG[mode_key]
-                    st.markdown(f"""
-                    <div style='background: #2d3139; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid #3d4149; box-shadow: 0 2px 8px rgba(0,0,0,0.3);'>
-                        <h3>{mode['name']}</h3>
-                        <p style='color: #aaa;'>{mode['description']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            st.markdown("---")
-            st.markdown("### 🤔 Experimente perguntar")
-
-            ex_col1, ex_col2, ex_col3 = st.columns(3)
-            with ex_col1:
-                st.info("Me explique o que é computação quântica em termos simples.")
-            with ex_col2:
-                st.info("Escreva um código em Python para um jogo da cobrinha (snake).")
-            with ex_col3:
-                st.info("Quais são os prós e contras de usar React vs. Vue?")
-
-            st.info("💡 **Para começar, clique em '➕ Novo Chat' na barra lateral!**")
-
+        st.info("💡 **Para começar, clique em '➕ Novo Chat' na barra lateral!**")
+    
+    else:
+        # --- TELA DE CHAT ATIVO ---
+        if st.session_state.user.get('is_guest'):
+            chat = st.session_state.guest_chats[st.session_state.current_chat_id]
+            chat_info = (chat['name'], chat['mode'])
         else:
-            # --- TELA DE CHAT ATIVO ---
+            chat_info = get_chat_info(st.session_state.current_chat_id)
+        
+        if chat_info:
+            chat_name, current_mode = chat_info
+            
+            col1, col2, col3 = st.columns([2, 1, 1])
+            
+            with col1:
+                mode_name = MODES_CONFIG[current_mode]['short_name']
+                st.markdown(f"### 💬 {chat_name} <span class='mode-badge'>{mode_name}</span>", unsafe_allow_html=True)
+            
+            with col2:
+                mode_options = {k: v["name"] for k, v in MODES_CONFIG.items()}
+                selected_mode = st.selectbox(
+                    "Modo",
+                    options=list(mode_options.keys()),
+                    format_func=lambda x: mode_options[x],
+                    index=list(mode_options.keys()).index(current_mode),
+                    key="mode_selector",
+                    label_visibility="collapsed"
+                )
+                
+                if selected_mode != current_mode:
+                    if st.session_state.user.get('is_guest'):
+                        st.session_state.guest_chats[st.session_state.current_chat_id]['mode'] = selected_mode
+                    else:
+                        update_chat_mode(st.session_state.current_chat_id, selected_mode)
+                    st.rerun()
+            
+            # Obter mensagens formatadas para a API
+            messages_for_api = []
             if st.session_state.user.get('is_guest'):
-                chat = st.session_state.guest_chats[st.session_state.current_chat_id]
-                chat_info = (chat['name'], chat['mode'])
+                messages_for_api = st.session_state.guest_messages.get(st.session_state.current_chat_id, [])
             else:
-                chat_info = get_chat_info(st.session_state.current_chat_id)
+                db_messages = get_chat_messages(st.session_state.current_chat_id)
+                # Formato para API: [{'role': ..., 'content': ...}]
+                messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
 
-            if chat_info:
-                chat_name, current_mode = chat_info
-
-                col1, col2, col3 = st.columns([2, 1, 1])
-
-                with col1:
-                    mode_name = MODES_CONFIG[current_mode]['short_name']
-                    st.markdown(f"### 💬 {chat_name} <span class='mode-badge'>{mode_name}</span>", unsafe_allow_html=True)
-
-                with col2:
-                    mode_options = {k: v["name"] for k, v in MODES_CONFIG.items()}
-                    selected_mode = st.selectbox(
-                        "Modo",
-                        options=list(mode_options.keys()),
-                        format_func=lambda x: mode_options[x],
-                        index=list(mode_options.keys()).index(current_mode),
-                        key="mode_selector",
-                        label_visibility="collapsed"
+            with col3:
+                if messages_for_api:
+                    chat_text = export_chat_to_text(messages_for_api, chat_name)
+                    st.download_button(
+                        label="📥 Exportar",
+                        data=chat_text,
+                        file_name=f"{chat_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                        mime="text/plain",
+                        use_container_width=True
                     )
-
-                    if selected_mode != current_mode:
-                        if st.session_state.user.get('is_guest'):
-                            st.session_state.guest_chats[st.session_state.current_chat_id]['mode'] = selected_mode
-                        else:
-                            update_chat_mode(st.session_state.current_chat_id, selected_mode)
-                        st.rerun()
-
-                # Obter mensagens formatadas para a API
-                messages_for_api = []
-                if st.session_state.user.get('is_guest'):
-                    messages_for_api = st.session_state.guest_messages.get(st.session_state.current_chat_id, [])
-                else:
-                    db_messages = get_chat_messages(st.session_state.current_chat_id)
-                    # Formato para API: [{'role': ..., 'content': ...}]
-                    messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
-
-                with col3:
-                    if messages_for_api:
-                        chat_text = export_chat_to_text(messages_for_api, chat_name)
-                        st.download_button(
-                            label="📥 Exportar",
-                            data=chat_text,
-                            file_name=f"{chat_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                            mime="text/plain",
-                            use_container_width=True
-                        )
-
-                st.caption(MODES_CONFIG[current_mode]['description'])
-                st.markdown("---")
-
-                # Container de Mensagens
-                if not messages_for_api:
-                    st.markdown("""
-                    <div style='text-align: center; padding: 3rem; color: #aaa;'>
-                        <h2>🤖</h2>
-                        <p style='font-size: 1.1rem;'>Olá! Como posso ajudar você hoje?</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    for msg in messages_for_api:
-                        role, content = msg['role'], msg['content']
-
-                        if role == "user":
-                            st.markdown(f'<div class="chat-message user-message"><div class="message-label">Você</div>{content}</div>', unsafe_allow_html=True)
-                        else:
-                            # role == 'assistant' ou 'model'
-                            formatted_content = format_message_with_code(content)
-                            st.markdown(f'<div class="chat-message assistant-message"><div class="message-label">🤖 PrimeBud</div>{formatted_content}</div>', unsafe_allow_html=True)
-
-                # Input de Mensagem
-                with st.form(key="message_form", clear_on_submit=True):
-                    user_input = st.text_area(
-                        "Mensagem",
-                        key="user_input",
-                        placeholder="Digite sua mensagem... (Ctrl+Enter para enviar)",
-                        label_visibility="collapsed"
-                    )
-
-                    submitted = st.form_submit_button("📤 Enviar", use_container_width=True)
-
-                    if submitted and user_input.strip():
-                        # Salva a mensagem do usuário
-                        if st.session_state.user.get('is_guest'):
-                            if st.session_state.current_chat_id not in st.session_state.guest_messages:
-                                st.session_state.guest_messages[st.session_state.current_chat_id] = []
-                            st.session_state.guest_messages[st.session_state.current_chat_id].append({
-                                'role': 'user', 'content': user_input
-                            })
-                            messages_for_api = st.session_state.guest_messages[st.session_state.current_chat_id]
-                        else:
-                            save_message(st.session_state.current_chat_id, "user", user_input)
-                            db_messages = get_chat_messages(st.session_state.current_chat_id)
-                            messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
-
-                        # Chama o roteador de API (ATUALIZADO)
-                        with st.spinner("🤔 Processando..."):
-                            response_text, response_role = generate_chat_response(messages_for_api, current_mode)
-
-                        # Salva a resposta (convidado ou usuário)
-                        if st.session_state.user.get('is_guest'):
-                            st.session_state.guest_messages[st.session_state.current_chat_id].append({
-                                'role': response_role, 'content': response_text
-                            })
-                        else:
-                            save_message(st.session_state.current_chat_id, response_role, response_text)
-
-                        st.rerun()
-
-    # --- ABA 2: GERADOR DE VÍDEO (NOVA SEÇÃO) ---
-    with main_tab2:
-        st.markdown("### 🎬 Gerador de Vídeo (Simulação Veo 3.1)")
-        st.info("Esta é uma interface de simulação para gerar vídeos. Substitua a função `get_veo_response` pela sua lógica de API real.")
-
-        with st.form("video_form", clear_on_submit=False):
-            video_prompt = st.text_area(
-                "Prompt do Vídeo",
-                placeholder="Ex: Um cachorro golden retriever surfando em uma onda gigante, estilo cinematográfico...",
-                height=150
-            )
-            video_submitted = st.form_submit_button("🚀 Gerar Vídeo")
-
-        if video_submitted and video_prompt:
-            # Limpa o vídeo anterior
-            st.session_state.generated_video_url = None
-
-            # Chama a função (atualmente, uma simulação)
-            video_url = get_veo_response(video_prompt)
-
-            # Salva o resultado no estado da sessão
-            st.session_state.generated_video_url = video_url
-
-        # Exibe o vídeo se ele existir no estado da sessão
-        if st.session_state.generated_video_url:
+            
+            st.caption(MODES_CONFIG[current_mode]['description'])
             st.markdown("---")
-            st.markdown("#### Resultado do Vídeo:")
-            st.video(st.session_state.generated_video_url)
+            
+            # Container de Mensagens
+            if not messages_for_api:
+                st.markdown("""
+                <div style='text-align: center; padding: 3rem; color: #aaa;'>
+                    <h2>🤖</h2>
+                    <p style='font-size: 1.1rem;'>Olá! Como posso ajudar você hoje?</p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                for msg in messages_for_api:
+                    role, content = msg['role'], msg['content']
+                    
+                    if role == "user":
+                        st.markdown(f'<div class="chat-message user-message"><div class="message-label">Você</div>{content}</div>', unsafe_allow_html=True)
+                    else:
+                        # role == 'assistant' ou 'model'
+                        formatted_content = format_message_with_code(content)
+                        st.markdown(f'<div class="chat-message assistant-message"><div class="message-label">🤖 PrimeBud</div>{formatted_content}</div>', unsafe_allow_html=True)
+            
+            # Input de Mensagem
+            with st.form(key="message_form", clear_on_submit=True):
+                user_input = st.text_area(
+                    "Mensagem",
+                    key="user_input",
+                    placeholder="Digite sua mensagem... (Ctrl+Enter para enviar)",
+                    label_visibility="collapsed"
+                )
+                
+                submitted = st.form_submit_button("📤 Enviar", use_container_width=True)
+                
+                if submitted and user_input.strip():
+                    # Salva a mensagem do usuário
+                    if st.session_state.user.get('is_guest'):
+                        if st.session_state.current_chat_id not in st.session_state.guest_messages:
+                            st.session_state.guest_messages[st.session_state.current_chat_id] = []
+                        st.session_state.guest_messages[st.session_state.current_chat_id].append({
+                            'role': 'user', 'content': user_input
+                        })
+                        messages_for_api = st.session_state.guest_messages[st.session_state.current_chat_id]
+                    else:
+                        save_message(st.session_state.current_chat_id, "user", user_input)
+                        db_messages = get_chat_messages(st.session_state.current_chat_id)
+                        messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
+
+                    # Chama o roteador de API (ATUALIZADO)
+                    with st.spinner("🤔 Processando..."):
+                        response_text, response_role = generate_chat_response(messages_for_api, current_mode)
+                    
+                    # Salva a resposta (convidado ou usuário)
+                    if st.session_state.user.get('is_guest'):
+                        st.session_state.guest_messages[st.session_state.current_chat_id].append({
+                            'role': response_role, 'content': response_text
+                        })
+                    else:
+                        save_message(st.session_state.current_chat_id, response_role, response_text)
+                    
+                    st.rerun()
+
 
