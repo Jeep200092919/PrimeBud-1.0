@@ -17,37 +17,37 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Configuração dos Modos (ATUALIZADO PARA MIXTRAL / GPT-OSS)
+# 2. Configuração dos Modos (ATUALIZADO PARA LLAMA 3)
 MODES_CONFIG = {
     "primebud_1_0_flash": {
         "name": "⚡ PrimeBud 1.0 Flash (Groq)",
         "short_name": "Flash",
-        "description": "Respostas ultrarrápidas (openai/gpt-oss-120b)",
+        "description": "Respostas ultrarrápidas (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
         "temperature": 0.3,
         "max_tokens": 500,
         "api_provider": "groq", # <-- Define o provedor
-        "model": "mixtral-8x7b-32768" # <-- Este é o ID do modelo "GPT-OSS"
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_0": {
         "name": "🔵 PrimeBud 1.0 (Groq)",
         "short_name": "1.0",
-        "description": "Versão clássica balanceada (openai/gpt-oss-120b)",
+        "description": "Versão clássica balanceada (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
         "temperature": 0.7,
         "max_tokens": 2000,
         "api_provider": "groq",
-        "model": "mixtral-8x7b-32768" # <-- Este é o ID do modelo "GPT-OSS"
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
         "name": "⭐ PrimeBud 1.5 (Groq)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (openai/gpt-oss-120b)",
+        "description": "Híbrido inteligente (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
         "api_provider": "groq",
-        "model": "mixtral-8x7b-32768" # <-- Este é o ID do modelo "GPT-OSS"
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_2_0": {
         "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
@@ -509,7 +509,7 @@ def delete_chat(chat_id):
 # 6. Funções de Cliente de API (ATUALIZADO)
 
 def get_groq_response(messages, config):
-    """Chama a API Groq (Mixtral)."""
+    """Chama a API Groq (Llama 3).""" # <-- ATUALIZADO
     try:
         api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
         if not api_key:
@@ -684,7 +684,7 @@ if st.session_state.user is None:
         <div style='text-align: center; padding: 1rem;'>
             <p style='color: #aaa; font-size: 0.9rem;'>
                 <strong>Multi-API</strong> • <strong>Powered by Groq & Gemini</strong><br>
-                <span style='color: #ff6b35;'>Mixtral (GPT-OSS) & Gemini 2.5</span>
+                <span style='color: #ff6b35;'>Llama 3 (Groq) & Gemini 2.5</span>
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -913,6 +913,9 @@ else:
                         save_message(st.session_state.current_chat_id, response_role, response_text)
                     
                     st.rerun()
+
+
+
 
 
 
