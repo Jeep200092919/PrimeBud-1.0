@@ -22,7 +22,7 @@ MODES_CONFIG = {
     "primebud_1_0_flash": {
         "name": "⚡ PrimeBud 1.0 Flash (Groq)",
         "short_name": "Flash",
-        "description": "Respostas ultrarrápidas (Mixtral 8x7B)",
+        "description": "Respostas ultrarrápidas (openai/gpt-oss-120b)",
         "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
         "temperature": 0.3,
         "max_tokens": 500,
@@ -32,7 +32,7 @@ MODES_CONFIG = {
     "primebud_1_0": {
         "name": "🔵 PrimeBud 1.0 (Groq)",
         "short_name": "1.0",
-        "description": "Versão clássica balanceada (Mixtral 8x7B)",
+        "description": "Versão clássica balanceada (openai/gpt-oss-120b)",
         "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
         "temperature": 0.7,
         "max_tokens": 2000,
@@ -42,7 +42,7 @@ MODES_CONFIG = {
     "primebud_1_5": {
         "name": "⭐ PrimeBud 1.5 (Groq)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (Mixtral 8x7B)",
+        "description": "Híbrido inteligente (openai/gpt-oss-120b)",
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
@@ -913,6 +913,8 @@ else:
                         save_message(st.session_state.current_chat_id, response_role, response_text)
                     
                     st.rerun()
+
+
 
 
 
