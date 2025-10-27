@@ -8,7 +8,6 @@ from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
 import google.generativeai as genai # <-- NOVO IMPORT
-from openai import OpenAI # <-- IMPORT PARA GPT-5 NANO
 
 # 1. Configuração da Página
 st.set_page_config(
@@ -41,14 +40,14 @@ MODES_CONFIG = {
         "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
-        "name": "⭐ PrimeBud 1.5 (GPT-5 Nano)",
+        "name": "⭐ PrimeBud 1.5 (Groq)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (GPT-5 Nano)", # <-- ATUALIZADO PARA GPT-5 NANO
+        "description": "Híbrido inteligente (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
-        "api_provider": "openai", # <-- MUDOU PARA OPENAI
-        "model": "gpt-5" # <-- GPT-5 NANO
+        "api_provider": "groq",
+        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_2_0": {
         "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
@@ -591,31 +590,6 @@ def get_gemini_response(messages, config):
         return f"❌ Erro ao processar com Gemini: {str(e)}", "model"
 
 
-
-def get_openai_response(messages, config):
-    """Chama a API OpenAI (GPT-5 nano)."""
-    try:
-        api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
-        if not api_key:
-            return "❌ Erro: OPENAI_API_KEY não configurada.", "assistant"
-        
-        client = OpenAI(api_key=api_key)
-        
-        # OpenAI precisa de 'system' no início
-        full_messages = [
-            {"role": "system", "content": config["system_prompt"]}
-        ] + messages
-        
-        response = client.responses.create(
-            model=config["model"],
-            input=full_messages[-1]["content"] if messages else "Hello"
-        )
-        
-        return response.output_text, "assistant"
-    except Exception as e:
-        st.error(f"Erro ao contatar a API OpenAI: {e}")
-        return f"❌ Erro ao processar: {str(e)}", "assistant"
-
 def generate_chat_response(messages, mode):
     """Roteador: Chama a API correta com base no modo (NOVA FUNÇÃO)."""
     config = MODES_CONFIG[mode]
@@ -623,8 +597,6 @@ def generate_chat_response(messages, mode):
     
     if provider == "gemini":
         return get_gemini_response(messages, config)
-    elif provider == "openai": # <-- NOVO: OpenAI para GPT-5 nano
-        return get_openai_response(messages, config)
     else: # 'groq'
         return get_groq_response(messages, config)
 
