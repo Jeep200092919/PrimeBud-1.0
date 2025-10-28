@@ -8,6 +8,7 @@ from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
 import google.generativeai as genai # <-- NOVO IMPORT
+from openai import OpenAI # <-- IMPORT PARA DEEPSEEK V3
 
 # 1. Configuração da Página
 st.set_page_config(
@@ -40,14 +41,14 @@ MODES_CONFIG = {
         "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
-        "name": "⭐ PrimeBud 1.5 (Groq)",
+        "name": "⭐ PrimeBud 1.5 (DeepSeek V3)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (GPT-OSS 120B)", # <-- ATUALIZADO
+        "description": "Híbrido inteligente (DeepSeek V3 - 671B)", # <-- ATUALIZADO PARA DEEPSEEK V3
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
-        "api_provider": "groq",
-        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
+        "api_provider": "deepseek", # <-- MUDOU PARA DEEPSEEK
+        "model": "deepseek-chat" # <-- DEEPSEEK V3
     },
     "primebud_2_0": {
         "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
@@ -590,6 +591,37 @@ def get_gemini_response(messages, config):
         return f"❌ Erro ao processar com Gemini: {str(e)}", "model"
 
 
+
+def get_deepseek_response(messages, config):
+    """Chama a API DeepSeek V3 (compatível com OpenAI)."""
+    try:
+        api_key = os.getenv("DEEPSEEK_API_KEY") or st.secrets.get("DEEPSEEK_API_KEY")
+        if not api_key:
+            return "❌ Erro: DEEPSEEK_API_KEY não configurada.", "assistant"
+        
+        # DeepSeek usa API compatível com OpenAI
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.deepseek.com"
+        )
+        
+        # Formatar mensagens com system prompt
+        full_messages = [
+            {"role": "system", "content": config["system_prompt"]}
+        ] + messages
+        
+        response = client.chat.completions.create(
+            model=config["model"],
+            messages=full_messages,
+            temperature=config["temperature"],
+            max_tokens=config["max_tokens"]
+        )
+        
+        return response.choices[0].message.content, "assistant"
+    except Exception as e:
+        st.error(f"Erro ao contatar a API DeepSeek: {e}")
+        return f"❌ Erro ao processar: {str(e)}", "assistant"
+
 def generate_chat_response(messages, mode):
     """Roteador: Chama a API correta com base no modo (NOVA FUNÇÃO)."""
     config = MODES_CONFIG[mode]
@@ -597,6 +629,8 @@ def generate_chat_response(messages, mode):
     
     if provider == "gemini":
         return get_gemini_response(messages, config)
+    elif provider == "deepseek": # <-- NOVO: DeepSeek V3
+        return get_deepseek_response(messages, config)
     else: # 'groq'
         return get_groq_response(messages, config)
 
