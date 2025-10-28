@@ -41,14 +41,14 @@ MODES_CONFIG = {
         "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
-        "name": "⭐ PrimeBud 1.5 (DeepSeek V3)",
+        "name": "⭐ PrimeBud 1.5 (Llama 3.1 405B)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (DeepSeek V3 - 671B)", # <-- ATUALIZADO PARA DEEPSEEK V3
+        "description": "Híbrido inteligente (Llama 3.1 405B - GRATUITO)", # <-- LLAMA 3.1 405B
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
-        "api_provider": "deepseek", # <-- MUDOU PARA DEEPSEEK
-        "model": "deepseek-chat" # <-- DEEPSEEK V3
+        "api_provider": "groq", # <-- GROQ (GRATUITO)
+        "model": "llama-3.1-405b-reasoning" # <-- LLAMA 3.1 405B
     },
     "primebud_2_0": {
         "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
