@@ -8,6 +8,7 @@ from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
 import google.generativeai as genai # <-- NOVO IMPORT
+import anthropic # <-- IMPORT PARA CLAUDE
 
 # 1. Configuração da Página
 st.set_page_config(
@@ -40,14 +41,14 @@ MODES_CONFIG = {
         "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
-        "name": "⭐ PrimeBud 1.5 (Groq)",
+        "name": "⭐ PrimeBud 1.5 (Claude)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (GPT-OSS 120B)", # <-- ATUALIZADO
+        "description": "Híbrido inteligente (Claude 3.5 Sonnet)", # <-- ATUALIZADO PARA CLAUDE
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
-        "api_provider": "groq",
-        "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
+        "api_provider": "anthropic", # <-- MUDOU PARA ANTHROPIC
+        "model": "claude-3-5-sonnet-20241022" # <-- CLAUDE 3.5 SONNET
     },
     "primebud_2_0": {
         "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
@@ -590,6 +591,38 @@ def get_gemini_response(messages, config):
         return f"❌ Erro ao processar com Gemini: {str(e)}", "model"
 
 
+
+def get_claude_response(messages, config):
+    """Chama a API Anthropic (Claude)."""
+    try:
+        api_key = os.getenv("ANTHROPIC_API_KEY") or st.secrets.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            return "❌ Erro: ANTHROPIC_API_KEY não configurada.", "assistant"
+        
+        client = anthropic.Anthropic(api_key=api_key)
+        
+        # Formatar mensagens para Claude
+        claude_messages = []
+        for msg in messages:
+            if msg["role"] in ["user", "assistant"]:
+                claude_messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+        
+        response = client.messages.create(
+            model=config["model"],
+            max_tokens=config["max_tokens"],
+            temperature=config["temperature"],
+            system=config["system_prompt"],
+            messages=claude_messages
+        )
+        
+        return response.content[0].text, "assistant"
+    except Exception as e:
+        st.error(f"Erro ao contatar a API Claude: {e}")
+        return f"❌ Erro ao processar: {str(e)}", "assistant"
+
 def generate_chat_response(messages, mode):
     """Roteador: Chama a API correta com base no modo (NOVA FUNÇÃO)."""
     config = MODES_CONFIG[mode]
@@ -597,6 +630,8 @@ def generate_chat_response(messages, mode):
     
     if provider == "gemini":
         return get_gemini_response(messages, config)
+    elif provider == "anthropic": # <-- NOVO: Claude
+        return get_claude_response(messages, config)
     else: # 'groq'
         return get_groq_response(messages, config)
 
