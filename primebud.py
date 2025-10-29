@@ -8,7 +8,6 @@ from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
 import google.generativeai as genai # <-- NOVO IMPORT
-from openai import OpenAI # <-- IMPORT PARA DEEPSEEK V3
 
 # 1. Configuração da Página
 st.set_page_config(
