@@ -42,7 +42,7 @@ MODES_CONFIG = {
     "primebud_1_5": {
         "name": "⭐ PrimeBud 1.5 (Llama 3.3 70B)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (Llama 3.3 70B - GRATUITO)", # <-- LLAMA 3.3 70B
+        "description": "Híbrido inteligente (Llama 3.3 70B)", # <-- LLAMA 3.3 70B
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
@@ -57,7 +57,7 @@ MODES_CONFIG = {
         "temperature": 0.85,
         "max_tokens": 4000,
         "api_provider": "gemini", # <-- MUDOU
-        "model": "gemini-2.5-flash-preview-09-2025" # <-- MUDOU (Conforme solicitado)
+        "model": "gemini-2.5-pro" # <-- MUDOU (Conforme solicitado)
     },
 }
 
