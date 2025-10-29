@@ -8,6 +8,7 @@ from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
 import google.generativeai as genai # <-- NOVO IMPORT
+from openai import OpenAI # <-- IMPORT PARA DEEPSEEK V3
 
 # 1. Configuração da Página
 st.set_page_config(
@@ -20,7 +21,7 @@ st.set_page_config(
 # 2. Configuração dos Modos (ATUALIZADO PARA LLAMA 3)
 MODES_CONFIG = {
     "primebud_1_0_flash": {
-        "name": "⚡ PrimeBud 1.0 Flash (GPT)",
+        "name": "⚡ PrimeBud 1.0 Flash (Groq)",
         "short_name": "Flash",
         "description": "Respostas ultrarrápidas (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
@@ -30,7 +31,7 @@ MODES_CONFIG = {
         "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_0": {
-        "name": "🔵 PrimeBud 1.0 (GPT)",
+        "name": "🔵 PrimeBud 1.0 (Groq)",
         "short_name": "1.0",
         "description": "Versão clássica balanceada (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
@@ -40,24 +41,24 @@ MODES_CONFIG = {
         "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
-        "name": "⭐ PrimeBud 1.5 (Llamma)",
+        "name": "⭐ PrimeBud 1.5 (GPT-4.1 Mini)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (Llama 3.3 70B)", # <-- LLAMA 3.3 70B
+        "description": "Híbrido inteligente (GPT-4.1 Mini via Manus)", # <-- GPT-4.1 MINI
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
-        "api_provider": "groq", # <-- GROQ (GRATUITO)
-        "model": "llama-3.3-70b-versatile" # <-- LLAMA 3.3 70B
+        "api_provider": "manus", # <-- MANUS
+        "model": "gpt-4.1-mini" # <-- GPT-4.1 MINI
     },
     "primebud_2_0": {
-        "name": "🚀 PrimeBud 2.0 (Gemini 2.5)", # <-- MUDOU
+        "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
         "short_name": "2.0 Gemini",
         "description": "Versão avançada com máxima capacidade (Gemini)",
         "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
         "temperature": 0.85,
         "max_tokens": 4000,
         "api_provider": "gemini", # <-- MUDOU
-        "model": "gemini-2.5-flash" # <-- MUDOU (Conforme solicitado)
+        "model": "gemini-2.5-flash-preview-09-2025" # <-- MUDOU (Conforme solicitado)
     },
 }
 
@@ -621,6 +622,36 @@ def get_deepseek_response(messages, config):
         st.error(f"Erro ao contatar a API DeepSeek: {e}")
         return f"❌ Erro ao processar: {str(e)}", "assistant"
 
+def get_manus_response(messages, config):
+    """Chama a API Manus (compatível com OpenAI)."""
+    try:
+        api_key = os.getenv("MANUS_API_KEY") or st.secrets.get("MANUS_API_KEY")
+        if not api_key:
+            return "❌ Erro: MANUS_API_KEY não configurada.", "assistant"
+        
+        # Manus usa API compatível com OpenAI
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.manus.im/v1"
+        )
+        
+        # Formatar mensagens com system prompt
+        full_messages = [
+            {"role": "system", "content": config["system_prompt"]}
+        ] + messages
+        
+        response = client.chat.completions.create(
+            model=config["model"],
+            messages=full_messages,
+            temperature=config["temperature"],
+            max_tokens=config["max_tokens"]
+        )
+        
+        return response.choices[0].message.content, "assistant"
+    except Exception as e:
+        st.error(f"Erro ao contatar a API Manus: {e}")
+        return f"❌ Erro ao processar: {str(e)}", "assistant"
+
 def generate_chat_response(messages, mode):
     """Roteador: Chama a API correta com base no modo (NOVA FUNÇÃO)."""
     config = MODES_CONFIG[mode]
@@ -628,8 +659,10 @@ def generate_chat_response(messages, mode):
     
     if provider == "gemini":
         return get_gemini_response(messages, config)
-    elif provider == "deepseek": # <-- NOVO: DeepSeek V3
+    elif provider == "deepseek": # <-- DeepSeek V3
         return get_deepseek_response(messages, config)
+    elif provider == "manus": # <-- NOVO: Manus (GPT-4.1 Mini)
+        return get_manus_response(messages, config)
     else: # 'groq'
         return get_groq_response(messages, config)
 
