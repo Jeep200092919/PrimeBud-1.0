@@ -4,13 +4,29 @@ import hashlib  # <-- Revertido para hashlib
 import re
 import os
 import random
+import base64
 from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
 import google.generativeai as genai # <-- NOVO IMPORT
 from openai import OpenAI # <-- IMPORT PARA DEEPSEEK V3
+from PIL import Image
 
-# 1. Configuração da Página
+# 1. Função para carregar logo
+def get_logo_base64():
+    """Carrega o logo e converte para base64 para usar no HTML."""
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo.png")
+        if os.path.exists(logo_path):
+            with open(logo_path, "rb") as f:
+                return base64.b64encode(f.read()).decode()
+    except:
+        pass
+    return None
+
+LOGO_BASE64 = get_logo_base64()
+
+# 2. Configuração da Página
 st.set_page_config(
     page_title="PrimeBud 2.0",
     page_icon="🤖",
@@ -18,7 +34,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Configuração dos Modos (ATUALIZADO PARA LLAMA 3)
+# 3. Configuração dos Modos (ATUALIZADO PARA LLAMA 3)
 MODES_CONFIG = {
     "primebud_1_0_flash": {
         "name": "⚡ PrimeBud 1.0 Flash (Groq)",
@@ -697,7 +713,14 @@ if st.session_state.user is None:
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        st.markdown("<h1 style='text-align: center;'>🤖 PrimeBud 2.0</h1>", unsafe_allow_html=True)
+        # Logo e Título
+        if LOGO_BASE64:
+            st.markdown(f"""
+            <div style='text-align: center; margin-bottom: 1rem;'>
+                <img src='data:image/png;base64,{LOGO_BASE64}' width='120' style='border-radius: 20px; box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);'>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center;'>PrimeBud 2.0</h1>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; font-size: 1.1rem; color: #aaa;'>Assistente de IA de Nova Geração</p>", unsafe_allow_html=True)
         st.markdown("---")
         
@@ -762,7 +785,14 @@ if st.session_state.user is None:
 else:
     # --- SIDEBAR (Barra Lateral) ---
     with st.sidebar:
-        st.markdown("### 🤖 PrimeBud 2.0")
+        # Logo na sidebar
+        if LOGO_BASE64:
+            st.markdown(f"""
+            <div style='text-align: center; margin-bottom: 0.5rem;'>
+                <img src='data:image/png;base64,{LOGO_BASE64}' width='60' style='border-radius: 12px;'>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("### PrimeBud 2.0")
         st.markdown(f"**👤 {st.session_state.user['username']}**")
         st.caption(f"Plano: {st.session_state.user['plan'].upper()}")
         st.markdown("---")
@@ -828,6 +858,12 @@ else:
     # --- ÁREA PRINCIPAL ---
     if st.session_state.current_chat_id is None:
         # Tela de Boas-Vindas (com exemplos)
+        if LOGO_BASE64:
+            st.markdown(f"""
+            <div style='text-align: center; margin-bottom: 1rem;'>
+                <img src='data:image/png;base64,{LOGO_BASE64}' width='100' style='border-radius: 20px; box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);'>
+            </div>
+            """, unsafe_allow_html=True)
         st.markdown("<h1 style='text-align: center;'>👋 Bem-vindo ao PrimeBud 2.0</h1>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #aaa; margin-bottom: 2rem;'>Sua assistente Multi-API. Escolha um modo e comece a conversar.</p>", unsafe_allow_html=True)
         
@@ -970,8 +1006,25 @@ else:
                         messages_for_api = [{"role": m[0], "content": m[1]} for m in db_messages]
 
                     # Chama o roteador de API (ATUALIZADO)
-                    with st.spinner("🤔 Processando..."):
-                        response_text, response_role = generate_chat_response(messages_for_api, current_mode)
+                    # Mostrar logo animado durante processamento
+                    if LOGO_BASE64:
+                        with st.spinner(""):
+                            st.markdown(f"""
+                            <div style='text-align: center; margin: 2rem 0;'>
+                                <img src='data:image/png;base64,{LOGO_BASE64}' width='80' style='border-radius: 16px; animation: pulse 1.5s infinite;'>
+                                <p style='color: #ff6b35; margin-top: 1rem; font-weight: 600;'>Processando sua solicitação...</p>
+                            </div>
+                            <style>
+                            @keyframes pulse {{
+                                0%, 100% {{ opacity: 1; transform: scale(1); }}
+                                50% {{ opacity: 0.7; transform: scale(1.05); }}
+                            }}
+                            </style>
+                            """, unsafe_allow_html=True)
+                            response_text, response_role = generate_chat_response(messages_for_api, current_mode)
+                    else:
+                        with st.spinner("🤔 Processando..."):
+                            response_text, response_role = generate_chat_response(messages_for_api, current_mode)
                     
                     # Salva a resposta (convidado ou usuário)
                     if st.session_state.user.get('is_guest'):
