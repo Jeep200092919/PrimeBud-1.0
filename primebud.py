@@ -20,7 +20,7 @@ st.set_page_config(
 # 2. Configuração dos Modos (ATUALIZADO PARA LLAMA 3)
 MODES_CONFIG = {
     "primebud_1_0_flash": {
-        "name": "⚡ PrimeBud 1.0 Flash (Groq)",
+        "name": "⚡ PrimeBud 1.0 Flash (GPT)",
         "short_name": "Flash",
         "description": "Respostas ultrarrápidas (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0 Flash. Forneça respostas extremamente rápidas, diretas e concisas. Vá direto ao ponto sem rodeios.",
@@ -30,7 +30,7 @@ MODES_CONFIG = {
         "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_0": {
-        "name": "🔵 PrimeBud 1.0 (Groq)",
+        "name": "🔵 PrimeBud 1.0 (GPT)",
         "short_name": "1.0",
         "description": "Versão clássica balanceada (GPT-OSS 120B)", # <-- ATUALIZADO
         "system_prompt": "Você é o PrimeBud 1.0, a versão clássica. Forneça respostas equilibradas, completas e bem estruturadas, mantendo clareza e objetividade.",
@@ -40,7 +40,7 @@ MODES_CONFIG = {
         "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
-        "name": "⭐ PrimeBud 1.5 (Llama 3.3 70B)",
+        "name": "⭐ PrimeBud 1.5 (Llamma)",
         "short_name": "1.5",
         "description": "Híbrido inteligente (Llama 3.3 70B)", # <-- LLAMA 3.3 70B
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
@@ -50,7 +50,7 @@ MODES_CONFIG = {
         "model": "llama-3.3-70b-versatile" # <-- LLAMA 3.3 70B
     },
     "primebud_2_0": {
-        "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
+        "name": "🚀 PrimeBud 2.0 (Gemini 2.5)", # <-- MUDOU
         "short_name": "2.0 Gemini",
         "description": "Versão avançada com máxima capacidade (Gemini)",
         "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
