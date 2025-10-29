@@ -57,7 +57,7 @@ MODES_CONFIG = {
         "temperature": 0.85,
         "max_tokens": 4000,
         "api_provider": "gemini", # <-- MUDOU
-        "model": "gemini-2.5-pro" # <-- MUDOU (Conforme solicitado)
+        "model": "gemini-2.5-flash" # <-- MUDOU (Conforme solicitado)
     },
 }
 
