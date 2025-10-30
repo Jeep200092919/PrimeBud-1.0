@@ -9,7 +9,6 @@ from datetime import datetime
 from groq import Groq
 from contextlib import contextmanager
 import google.generativeai as genai # <-- NOVO IMPORT
-from openai import OpenAI # <-- IMPORT PARA DEEPSEEK V3
 from PIL import Image
 
 # 1. Função para carregar logo
