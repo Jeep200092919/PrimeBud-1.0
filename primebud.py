@@ -1,27 +1,15 @@
 import streamlit as st
-
 import sqlite3
-
 import hashlib  # <-- Revertido para hashlib
-
 import re
-
 import os
-
 import random
-
 import base64
-
 from datetime import datetime
-
 from groq import Groq
-
 from contextlib import contextmanager
-
 import google.generativeai as genai # <-- NOVO IMPORT
-
 from PIL import Image
-
 
 
 # 1. Função para carregar logo
