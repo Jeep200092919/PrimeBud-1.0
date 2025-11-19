@@ -56,14 +56,14 @@ MODES_CONFIG = {
         "model": "openai/gpt-oss-120b" # <-- ATUALIZADO CONFORME O SEU PEDIDO
     },
     "primebud_1_5": {
-        "name": "⭐ PrimeBud 1.5 (Llama 3.3 70B)",
+        "name": "⭐ PrimeBud 1.5 (Gpt oss 120B)",
         "short_name": "1.5",
-        "description": "Híbrido inteligente (Llama 3.3 70B - GRATUITO)", # <-- LLAMA 3.3 70B
+        "description": "Híbrido inteligente (gpt-oss-120b- GRATUITO)", # <-- LLAMA 3.3 70B
         "system_prompt": "Você é o PrimeBud 1.5, a versão híbrida premium. Combine clareza com profundidade, sendo detalhado quando necessário mas sempre mantendo objetividade e estrutura clara. Quando fornecer código, use blocos de código markdown com ```linguagem para melhor formatação.",
         "temperature": 0.75,
         "max_tokens": 3000,
         "api_provider": "groq", # <-- GROQ (GRATUITO)
-        "model": "llama-3.3-70b-versatile" # <-- LLAMA 3.3 70B
+        "model": "openai/gpt-oss-120b" # <-- LLAMA 3.3 70B
     },
     "primebud_2_0": {
         "name": "🚀 PrimeBud 2.0 (Gemini 2.5 flash)", # <-- MUDOU
