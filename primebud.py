@@ -66,14 +66,14 @@ MODES_CONFIG = {
         "model": "llama-3.3-70b-versatile" # <-- LLAMA 3.3 70B
     },
     "primebud_2_0": {
-        "name": "🚀 PrimeBud 2.0 (Gemini)", # <-- MUDOU
-        "short_name": "2.0 Gemini",
+        "name": "🚀 PrimeBud 2.0 (Gemini 3.0 Pro)", # <-- MUDOU
+        "short_name": "3.0 Gemini",
         "description": "Versão avançada com máxima capacidade (Gemini)",
-        "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 2.5. Você é a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
+        "system_prompt": "Você é o PrimeBud 2.0, rodando no Gemini 3.0. Você é a versão mais avançada. Forneça análises profundas, respostas extremamente detalhadas e completas, explorando múltiplas perspectivas e nuances. Seja o mais abrangente possível. Quando fornecer código, sempre use blocos de código markdown com ```linguagem.",
         "temperature": 0.85,
         "max_tokens": 4000,
         "api_provider": "gemini", # <-- MUDOU
-        "model": "gemini-3.0-flash" # <-- MUDOU (Conforme solicitado)
+        "model": "gemini-3-pro-preview" # <-- MUDOU (Conforme solicitado)
     },
 }
 
